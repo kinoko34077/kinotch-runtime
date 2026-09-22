@@ -1,10 +1,22 @@
 # KiNoTch. Runtime v0.1 Specification
 
+Status: provisional — Pilot validation pending
+
+This document describes the implemented Python reference contract. It is not
+yet a stable cross-repository contract: the first validation target is the
+`jev-audit` Pilot. Pilot evidence may change the contract before a stable v0.1
+is declared.
+
 ## Purpose
 
 KiNoTch. Runtime is the execution layer shared by KiNoTch. repositories. v0.1 is a small Python reference implementation for executing registered Actions and representing their common result, error, progress, resource, artifact, configuration, cancellation, and logging values.
 
 The Runtime owns execution semantics. Repository Base owns project structure, manifest, profiles, surfaces, and Runtime version references.
+
+The Runtime repository owns the canonical Execution Contract definitions under
+`project/contracts/execution/`. Any matching schemas inherited under
+`.kinotch/schemas/` are Base-side validation compatibility copies; they are not
+independently editable sources of truth.
 
 ## v0.1 scope
 
@@ -43,15 +55,23 @@ The registry returns a failed result with `NOT_FOUND` for an unknown Action. An 
 
 Error codes are extensible uppercase identifiers matching `^[A-Z][A-Z0-9_]*$`. v0.1 recommends `INVALID_INPUT`, `NOT_FOUND`, `CANCELLED`, and `INTERNAL_ERROR` but does not make the list a closed enum.
 
-`ActionResult` has one of `success`, `partial`, `failed`, or `cancelled` status. It serializes to JSON-compatible primitive/object/list values and keeps an optional structured error.
+`ActionResult` has one of `success`, `partial`, `failed`, or `cancelled` status.
+Failed and cancelled results require a structured error. Success results do not
+require an error; the treatment of an error on partial results remains
+provisional until Pilot evidence exists. The result envelope and Runtime-owned
+metadata serialize to JSON-compatible values. Payload values supplied by
+Actions or callers must be JSON-compatible when serialization is required.
 
 ## Configuration and logging
 
-`RuntimeConfig` is a read-only view over a caller-provided mapping. It does not read environment variables implicitly and never logs values. Logging uses Python's standard library and leaves handler/format policy to the host application.
+`RuntimeConfig` is a read-only view over a caller-provided mapping. It does not read environment variables implicitly and never logs values. `to_dict()` is a raw representation and is not a redacted secret-safe view; callers must protect any secret values they place in configuration. Logging uses Python's standard library and leaves handler/format policy to the host application.
 
 ## Compatibility
 
-Python 3.10+. The core package has no third-party runtime dependency. JSON serialization uses only standard-library-compatible values.
+Python 3.10+. The core package has no third-party runtime dependency. JSON
+serialization of the Runtime envelope uses only standard-library-compatible
+values. Domain payloads are the caller's responsibility and are not recursively
+validated by v0.1.
 
 The inherited `.kinotch/tests/run-tests.ps1` suite tests the Base repository's own identity and is not the Runtime project's test entry. Runtime verification uses the project command in `project/project.json`; Base self-tests remain owned by `kinotch-repository-base`.
 
