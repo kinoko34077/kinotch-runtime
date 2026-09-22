@@ -1,0 +1,16 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "kinotch-runtime"
+version = "0.1.0"
+description = "KiNoTch. Runtime v0.1 reference execution layer"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [{name = "KiNoTch."}]
+dependencies = []
+
+[tool.setuptools.packages.find]
+where = ["project/src"]

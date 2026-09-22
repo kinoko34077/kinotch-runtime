@@ -1,0 +1,15 @@
+{
+  "profile": "cli",
+  "status": "planned",
+  "description": "CLIツール。",
+  "runtime_modules": [
+    "kernel",
+    "errors",
+    "config",
+    "logging",
+    "cli"
+  ],
+  "surfaces": {
+    "cli": true
+  }
+}

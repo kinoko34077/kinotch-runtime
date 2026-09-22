@@ -1,0 +1,17 @@
+# KiNoTch. Runtime
+
+KiNoTch. Runtime v0.1 is the first small execution layer shared by KiNoTch. repositories.
+
+It provides a dependency-free Python reference implementation for registered Actions, structured results and errors, progress, cancellation, resources, artifacts, configuration, and logging. It intentionally does not provide CLI, MCP, API, GUI, deployment, filesystem, or provider policy.
+
+## Development
+
+```powershell
+python -m unittest discover -s project/tests -v
+.\knt.cmd doctor
+.\knt.cmd verify
+```
+
+The first integration target is `jev-audit`. Pilot work will remain in that repository; this Runtime repository is the execution-contract source.
+
+See [the specification](project/docs/SPEC.md) and [current state](project/docs/CURRENT_STATE.md).

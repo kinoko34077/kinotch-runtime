@@ -1,0 +1,15 @@
+{
+  "profile": "mcp",
+  "status": "planned",
+  "description": "MCP server/tool。",
+  "runtime_modules": [
+    "kernel",
+    "errors",
+    "config",
+    "logging",
+    "mcp"
+  ],
+  "surfaces": {
+    "mcp": true
+  }
+}

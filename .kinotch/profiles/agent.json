@@ -1,0 +1,15 @@
+{
+  "profile": "agent",
+  "status": "planned",
+  "description": "Agent orchestration。Action自体はApplication側を共有。",
+  "runtime_modules": [
+    "kernel",
+    "errors",
+    "config",
+    "logging",
+    "agent"
+  ],
+  "surfaces": {
+    "agent": true
+  }
+}
