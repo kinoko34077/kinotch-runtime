@@ -1,6 +1,6 @@
 # Current State
 
-Last verified: 2026-09-23 — KiNoTch. Runtime v0.1 portable-contract整理 and SynTrail-LM design probe in progress
+Last verified: 2026-09-23 — KiNoTch. Runtime v0.1 portable-contract整理 and SynTrail-LM design probe complete
 
 ## Implemented
 
@@ -33,7 +33,10 @@ Last verified: 2026-09-23 — KiNoTch. Runtime v0.1 portable-contract整理 and 
   production Runtime integration remains HOLD.
 - Language-specific bindings have not started.
 - SynTrail-LM is being inspected at its exact `origin/main` commit as a
-  design-only third Pilot; its existing dirty user worktree is not modified.
+  design-only third Pilot; its existing dirty user worktree was not modified.
+- SynTrail-LM design probe result: Progress is PARTIAL GO; direct
+  CancellationToken mapping is REJECTED/REVISE; Resource and Artifact are HOLD.
+- No SynTrail-LM production code, Rust Runtime crate, or Surface Pack was added.
 
 ## Known constraints
 
@@ -53,6 +56,6 @@ Last verified: 2026-09-23 — KiNoTch. Runtime v0.1 portable-contract整理 and 
 2. Carry only Action ID and ActionError semantics as observed candidates;
    keep ActionRequest and ActionResult implementation on HOLD.
 3. Reassess maturity after a heterogeneous repository before declaring stable.
-4. Complete the SynTrail-LM design probe for Progress, cancellation lifecycle,
-   Resource, and Artifact; advance only the Contract meanings that survive
-   per-item GO/PARTIAL GO/HOLD/REJECT review.
+4. Update Contract maturity and ADR from the SynTrail-LM design evidence;
+   advance only the Contract meanings that survive per-item
+   GO/PARTIAL GO/HOLD/REJECT review.
