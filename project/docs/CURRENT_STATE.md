@@ -27,8 +27,9 @@ Last verified: 2026-09-22 — KiNoTch. Runtime v0.1 Pilot evaluation complete
 - The first `jev-audit` Pilot bridge is implemented and live CLI/MCP comparison
   has completed.
 - First-Pilot Contract evaluation is complete; no Contract is stable yet.
-- `kinotch-api` is GO for design-only investigation and HOLD for implementation
-  until an HTTP-native boundary is shown to be natural.
+- `kinotch-api` design-only investigation is complete: Action ID and error
+  semantics are PARTIAL GO through a test-only plain-object probe, while
+  production Runtime integration remains HOLD.
 - Language-specific bindings have not started.
 
 ## Known constraints
@@ -44,9 +45,8 @@ Last verified: 2026-09-22 — KiNoTch. Runtime v0.1 Pilot evaluation complete
 
 ## Next work
 
-1. Run the limited `kinotch-api` second-Pilot design probe if its boundary
-   remains natural after review.
-2. Carry only Action ID, ActionRequest, and ActionError meanings into the
-   next Pilot; defer ActionRegistry, unused services, and ActionResult
-   implementation unless evidence requires them.
+1. Keep the `kinotch-api` production boundary unchanged unless a pure
+   application operation appears without Response or Context wrapping.
+2. Carry only Action ID and ActionError semantics as observed candidates;
+   keep ActionRequest and ActionResult implementation on HOLD.
 3. Reassess maturity after a heterogeneous repository before declaring stable.

@@ -1,6 +1,6 @@
 # kinotch-api Second Pilot Design Probe
 
-Status: design probe prepared; implementation HOLD pending the boundary decision
+Status: test-only semantic probe complete; PARTIAL GO semantics; production integration HOLD
 
 ## Purpose
 
@@ -234,14 +234,26 @@ dependency, or any public API behavior change. A HOLD is a valid scope result:
 Runtime may be useful for local Python Action execution while being unsuitable
 for this HTTP proxy boundary.
 
-## Initial decision before production changes
+## Design Probe decision
 
-Design-only probe: **PARTIAL GO for Action ID and error semantics; HOLD for
-ActionRegistry, ActionRequest implementation, ActionResult, and all unused
-Runtime services.**
+The source and verification evidence support **PARTIAL GO for Action ID and
+error semantics only**. Keep **HOLD** for ActionRegistry, ActionRequest
+implementation, ActionResult, and all unused Runtime services.
 
-No `kinotch-api` production code, dependency, Surface Pack, or deployment
-configuration is changed by this document. A later test-only probe may compare
-the existing error object to a portable plain-object shape, but it must first
-preserve status, code, message, details, request ID, headers, and Service
-Binding behavior.
+The current production path has zero Runtime wrappers, zero Runtime
+dependencies, and zero public-contract conversions. The existing `npm test`
+suite completed with 149 passing tests and one intentional skip; the Gateway
+Wrangler dry-run completed successfully. These checks confirm the existing
+boundary but do not make the Runtime Contract multi-repo-validated.
+
+The test-only plain-object probe now preserves existing Policy IDs and
+lower-snake API error codes. It uses `routePolicies.transformBatch.id` and the
+real `validateBatchBody()` result without changing the production path. No
+`kinotch-api` production code, dependency, Surface Pack, or deployment
+configuration is changed. The probe preserves status, code, message, details,
+request ID, headers, and Service Binding behavior by leaving their owners
+untouched.
+
+The complete API suite after the probe passed 151 tests with one intentional
+live-compression skip. This is design-probe evidence, not a Runtime integration
+and not `multi-repo-validated` maturity.

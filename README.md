@@ -14,7 +14,8 @@ python -m unittest discover -s project/tests -v
 
 The first integration Pilot is `jev-audit`. Its CLI/MCP live comparison is
 complete, but the Contract remains provisional because one Python repository is
-not enough for cross-repository stability. Pilot evaluation and the limited
-`kinotch-api` second-Pilot design are recorded in the Runtime documentation.
+not enough for cross-repository stability. The `kinotch-api` design probe is
+also complete as a test-only semantic probe; production Runtime integration is
+on hold. The evidence is recorded in the Runtime documentation.
 
 See [the specification](project/docs/SPEC.md) and [current state](project/docs/CURRENT_STATE.md).
