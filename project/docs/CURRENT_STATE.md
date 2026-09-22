@@ -19,6 +19,7 @@ Last verified: 2026-09-22 — KiNoTch. Runtime v0.1 Pilot evaluation complete
 - `jev-audit` optional `repo.audit` bridge validated through the Runtime kernel
 - Contract maturity matrix and first-Pilot ADR
 - Limited `kinotch-api` second-Pilot design with implementation hold conditions
+- Separate Python reference and cross-language Contract classifications
 
 ## In progress
 
@@ -45,6 +46,7 @@ Last verified: 2026-09-22 — KiNoTch. Runtime v0.1 Pilot evaluation complete
 
 1. Run the limited `kinotch-api` second-Pilot design probe if its boundary
    remains natural after review.
-2. Keep only the evaluated Action/Request/Error meanings in the next Pilot;
-   defer unused execution contracts.
+2. Carry only Action ID, ActionRequest, and ActionError meanings into the
+   next Pilot; defer ActionRegistry, unused services, and ActionResult
+   implementation unless evidence requires them.
 3. Reassess maturity after a heterogeneous repository before declaring stable.

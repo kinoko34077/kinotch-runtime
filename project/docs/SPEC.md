@@ -1,6 +1,6 @@
 # KiNoTch. Runtime v0.1 Specification
 
-Status: provisional — first Pilot completed; contract evaluation pending
+Status: provisional — first Pilot evaluated; heterogeneous validation pending
 
 This document describes the implemented Python reference contract. It is not
 yet a stable cross-repository contract: the `jev-audit` Pilot is complete, but

@@ -1,60 +1,66 @@
 # Runtime Contract Maturity Matrix
 
-The matrix separates implementation from evidence. `pilot-exercised` means a
-real `jev-audit` execution path used the value. It does not mean the Contract
-reduced complexity or is stable. No Contract below is `multi-repo-validated` or
-`stable`.
+The matrix separates two decisions. `Reference implementation` describes the
+Python v0.1 package and its unit-test status. `Cross-language Contract` asks
+whether the same meaning should cross the Python/JavaScript boundary. A
+`pilot-exercised` value was used by the real `jev-audit` path; it is not proof
+of reduced maintenance or stability.
 
-| Contract | Implemented | Unit-tested | jev-audit Pilot | Maturity | Decision |
+No Contract below is `stable`. The `jev-audit` Pilot alone cannot earn
+`multi-repo-validated`.
+
+| Contract | Reference implementation | Cross-language Contract | jev-audit evidence | Next Pilot | Decision |
 |---|---|---|---|---|---|
-| ActionRegistry | yes | yes | CLI and MCP register/execute `repo.audit` | pilot-exercised | KEEP |
-| ActionRequest | yes | yes | `repo.audit` request envelope used | pilot-exercised | KEEP |
-| ActionContext | yes | yes | empty context constructed only | pilot-exercised, incidental | REVISE |
-| ActionResult | yes | yes | success wrapper carries `AuditReport` | pilot-exercised | REVISE |
-| ActionError | yes | yes | missing profile maps to `NOT_FOUND` | pilot-exercised | KEEP |
-| ActionErrorException | yes | yes | expected bridge errors use it | pilot-exercised | REVISE |
-| CancellationToken | yes | yes | not exercised | unit-tested | DEFER |
-| ProgressEvent | yes | yes | not exercised | unit-tested | DEFER |
-| ProgressReporter | yes | yes | not exercised | unit-tested | DEFER |
-| Resource | yes | yes | not exercised | unit-tested | DEFER |
-| Artifact | yes | yes | not exercised | unit-tested | DEFER |
-| RuntimeConfig | yes | yes | not used; no config mapping | unit-tested | DEFER |
-| Logging boundary | yes | yes | incidental Runtime error log only | unit-tested | DEFER |
+| Action ID | implemented, unit-tested | candidate | `repo.audit` identifier used | carry as operation identifier | KEEP |
+| ActionRegistry | implemented, unit-tested | not required by API boundary | CLI/MCP register/execute `repo.audit` | do not introduce | Python KEEP / cross-language DEFER |
+| ActionRequest | implemented, unit-tested | candidate, wrapper shape unvalidated | request envelope used | observe plain-object mapping only | KEEP candidate |
+| ActionContext | implemented, unit-tested | not required as service bundle | empty context constructed only | exclude service bundle | REVISE |
+| ActionResult | implemented, unit-tested | observation target only | wrapper carried `AuditReport` then unwrapped | do not wrap HTTP `Response` | REVISE / HOLD |
+| ActionError | implemented, unit-tested | candidate semantics | missing profile maps to `NOT_FOUND` | compare with API error fields | KEEP candidate |
+| ActionErrorException | implemented, unit-tested | Python-specific | expected bridge errors use it | do not carry exception class | REVISE |
+| CancellationToken | implemented, unit-tested | unvalidated | not exercised | exclude | DEFER |
+| ProgressEvent | implemented, unit-tested | unvalidated | not exercised | exclude | DEFER |
+| ProgressReporter | implemented, unit-tested | unvalidated | not exercised | exclude | DEFER |
+| Resource | implemented, unit-tested | unvalidated | not exercised | exclude | DEFER |
+| Artifact | implemented, unit-tested | unvalidated | not exercised | exclude | DEFER |
+| RuntimeConfig | implemented, unit-tested | unvalidated | not used | exclude | DEFER |
+| Logging boundary | implemented, unit-tested | unvalidated | incidental Runtime error log | exclude | DEFER |
 
 ## Interpretation
 
-### KEEP
+### Keep for the second-Pilot candidate set
 
-`ActionRegistry`, `ActionRequest`, `ActionError`, and Action ID validation are
-small enough to carry into the next design probe. They were exercised without
-changing the Audit Core, but they are not yet `pilot-validated`: the Pilot did
-not demonstrate a measurable reduction in maintenance work.
+`Action ID`, `ActionRequest`, and `ActionError` remain the only meanings to
+observe across the Python/JavaScript boundary. The observation must use plain
+objects or existing values where possible; it must not require a new runtime
+library, registry, framework adapter, or public API rename.
 
-### REVISE
+### Python reference only
 
-`ActionResult` currently accepts arbitrary domain data and is immediately
-unwrapped by the `jev-audit` bridge. The envelope is therefore a candidate,
-not a proven shared output format. `ActionContext` was constructed but its
-configuration, progress, cancellation, and logger services were unused.
-`ActionErrorException` is useful inside the Python kernel, but its Python
-exception shape should not be treated as a cross-language Contract.
+`ActionRegistry` remains useful and tested in the Python reference kernel. It
+is a dispatch implementation detail, however, and `kinotch-api` already has
+Hono routing, `routePolicies`, and `registerRoute`. Adding a second registry
+would create duplicate dispatch rather than a shared meaning.
 
-### DEFER
+### Revise or hold
+
+`ActionContext` is not a cross-language service bundle yet. `ActionResult` is
+an observation target only because the first Pilot immediately unwrapped the
+domain payload, and the API Gateway returns an HTTP `Response`. The second
+Pilot must not wrap that response merely to make the types look similar.
+`ActionErrorException` remains a Python implementation mechanism rather than a
+portable Contract.
+
+### Defer
 
 Cancellation, progress, resources, artifacts, configuration, and logging have
-unit tests but no real Pilot demand. They remain available in the reference
-implementation without being required by the next Pilot.
-
-### REMOVE
-
-No Contract is removed in this evaluation. The evidence supports shrinking the
-next Pilot surface, not deleting tested reference values before a second
-heterogeneous validation.
+reference tests but no real second-Pilot demand. They are not removed from the
+reference implementation and are not required by the API probe.
 
 ## Maturity rule
 
-The Runtime remains `provisional`. `pilot-exercised` is the highest status
-earned by the `jev-audit` Pilot. `pilot-validated` requires evidence that the
-existing repository became simpler or had a common change reason centralized;
-`stable` additionally requires the same meaning in at least one heterogeneous
-repository.
+`implemented` and `unit-tested` describe the reference package. A
+cross-language meaning may become `pilot-exercised` only after the JavaScript
+probe uses it naturally. `multi-repo-validated` requires the same meaning and
+change reason in both repositories. `stable` additionally requires unresolved
+REVISE/HOLD concerns to be closed; the second Pilot alone does not grant it.
