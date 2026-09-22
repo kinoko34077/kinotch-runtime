@@ -46,6 +46,10 @@ Last verified: 2026-09-23 — KiNoTch. Runtime v0.1 fourth/fifth Pilot design-pr
   ResourceLedger semantics local. Artifact reference metadata is a narrow
   PARTIAL GO candidate; cancellation remains REVISE and no production code or
   binding was added.
+- Base Default-first standardization is now a parallel path: removable
+  Surface / Tool conveniences can be offered as Project-level Defaults without
+  promoting them to Portable Contracts. Base now provides a safe profile-aware
+  `knt init` foundation; Runtime does not implement those Defaults.
 
 ## Known constraints
 
@@ -72,3 +76,6 @@ Last verified: 2026-09-23 — KiNoTch. Runtime v0.1 fourth/fifth Pilot design-pr
 6. Compare the narrow artifact-reference candidate with another real consumer
    only if it preserves the same identity-versus-authority distinction; do not
    promote it or create a package from one Agent implementation.
+7. Keep Default Pack adoption independent from Contract maturity; add Runtime
+   or Surface code only when a Default has a separate, low-risk implementation
+   boundary and remains overrideable or disableable.

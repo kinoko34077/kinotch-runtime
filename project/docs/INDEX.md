@@ -16,3 +16,4 @@
 - [Execution Contract](../contracts/execution/README.md)
 - [Implementation Plan](../../docs/superpowers/plans/2026-09-22-runtime-v01.md)
 - [Base Runtime Integration](../../.kinotch/RUNTIME_INTEGRATION.md)
+- [Base Default-first standard](https://github.com/kinoko34077/kinotch-repository-base/blob/main/.kinotch/meta/06_DEFAULT_FIRST_STANDARD.md)

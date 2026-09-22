@@ -12,6 +12,20 @@ The maturity and pilot decision for each item remain in
 semantic boundary; it does not promote an untested candidate to a stable
 Contract.
 
+## Relationship to Default-first behavior
+
+Repository Base may provide low-risk, removable Surface / Tool Defaults before
+the corresponding meaning has cleared Portable Contract maturity. Those
+Defaults are selected per Project as `DEFAULT`, `OVERRIDE`, or `DISABLED` and
+remain owned by the Project or host Surface. A Default is not a Runtime
+Contract, and repeated Default usage alone does not promote it to this
+document.
+
+Only behavior that must retain the same meaning and change reason across
+different implementations belongs in this Portable Contract. Default Pack
+code must not force a Domain model, public API, persistent format, or authority
+boundary to match a Python Runtime type.
+
 ## Portable operation identity
 
 An operation can be identified by a non-empty, stable identifier that is

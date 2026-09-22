@@ -19,6 +19,20 @@ The Runtime repository owns the canonical Execution Contract definitions under
 `.kinotch/schemas/` are Base-side validation compatibility copies; they are not
 independently editable sources of truth.
 
+## Default-first boundary
+
+Repository Base defines the Default-first policy in
+[`.kinotch/meta/06_DEFAULT_FIRST_STANDARD.md`](https://github.com/kinoko34077/kinotch-repository-base/blob/main/.kinotch/meta/06_DEFAULT_FIRST_STANDARD.md).
+Surface and tool conveniences may be offered as Project-level `DEFAULT`,
+`OVERRIDE`, or `DISABLED` behavior without waiting for Portable Contract
+maturity. Runtime Contract maturity labels apply only to L3 Portable Semantic
+Contracts; adopting a Default does not promote its behavior into Runtime.
+
+Runtime remains responsible for execution semantics and Portable Contract
+definitions. Default Pack implementations remain host- and Surface-appropriate
+and must not move Domain behavior, public compatibility rules, persistent
+formats, or authority policy into this repository.
+
 ## v0.1 scope
 
 Defined and implemented in this repository:
