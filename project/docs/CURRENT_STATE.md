@@ -49,7 +49,8 @@ Last verified: 2026-09-23 — KiNoTch. Runtime v0.1 fourth/fifth Pilot design-pr
 - Base Default-first standardization is now a parallel path: removable
   Surface / Tool conveniences can be offered as Project-level Defaults without
   promoting them to Portable Contracts. Base now provides a safe profile-aware
-  `knt init` foundation; Runtime does not implement those Defaults.
+  `knt init` foundation and non-destructive `knt migrate`; Runtime does not
+  implement those Defaults.
 
 ## Known constraints
 
