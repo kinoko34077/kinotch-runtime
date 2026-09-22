@@ -1,6 +1,6 @@
 # SynTrail-LM Runtime Design Probe
 
-Status: design-only probe complete; no SynTrail-LM production code changed
+Status: evaluation complete; design-only probe; no SynTrail-LM production code changed
 
 Observed commit: `2326cf1f58f78a74aff28286a381e2161da19064` (`origin/main`)
 
@@ -180,6 +180,57 @@ artifact wrapper or Rust Runtime crate is justified.
 The result is not a Runtime integration. It is evidence that a narrow
 portable progress vocabulary may be useful later, while the current
 cancellation/resource/artifact abstractions need revision or deferral.
+
+## Evaluation complete
+
+### What worked
+
+- The existing Trainer worker already has a concrete event stream with source
+  progress, checkpoints, analytics, and terminal lifecycle events.
+- The event meanings can be described without changing the Trainer domain or
+  adding a Runtime dependency.
+- The inspection exposed why Pause, Resume, Stop, disconnect, and persistence
+  failure cannot be treated as one cancellation operation.
+- Existing model output and trainer resume state are deliberately separated,
+  so the probe did not force a false Artifact unification.
+
+### What did not reduce complexity
+
+- There is only a private Trainer event protocol and one observed GUI consumer;
+  a new portable event adapter would currently duplicate the enum.
+- A Runtime cancellation token would add conversion and erase the distinction
+  between resumable Pause and terminal Stop.
+- Resource and Artifact wrappers would package and immediately unwrap concrete
+  paths, datasets, model files, or resume state.
+
+### What remains unvalidated
+
+- Progress semantics across a second consumer or a second heterogeneous
+  repository.
+- A portable cancellation lifecycle that can represent request, observation,
+  pause/resume, terminal stop, and persistence failure without collapsing
+  domain state.
+- Any cross-repository Resource or Artifact meaning.
+
+### Contract decisions
+
+| Contract | Decision | Maturity consequence |
+|---|---|---|
+| Progress | PARTIAL GO | Keep as a semantic candidate; do not call it multi-repo-validated. |
+| Cancellation | REVISE / direct mapping REJECTED | Keep Python implementation for its reference use, but revise portable lifecycle before reuse. |
+| Resource | HOLD | No portable promotion. |
+| Artifact | HOLD | No portable promotion; preserve persistence distinctions. |
+
+No production Pilot, Rust Runtime crate, or Surface Pack follows from this
+evidence. No Contract is promoted to `stable`.
+
+### Next validation
+
+The next useful evidence for Progress is a second real consumer or an
+application boundary that is not the private Trainer GUI enum. Cancellation
+requires a Runtime Contract revision first. Resource and Artifact remain
+project-specific unless another repository demonstrates the same meaning and
+change reason.
 
 ## Next validation
 

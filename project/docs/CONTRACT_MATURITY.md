@@ -82,6 +82,23 @@ probe. The SynTrail-LM design probe will inspect only the existing meanings of
 Progress, cancellation lifecycle, Resource, and Artifact; it will not add a
 Rust Runtime crate by default.
 
+## SynTrail-LM design-probe evidence
+
+The third Pilot inspected the exact SynTrail-LM `origin/main` commit
+`2326cf1`. It was a design-only probe; no SynTrail-LM production code or Rust
+Runtime crate was added.
+
+| Contract | SynTrail evidence | Decision | Maturity effect |
+|---|---|---|---|
+| Progress | Private Trainer worker event stream with source bytes, checkpoints, analytics, and terminal events consumed by the GUI | PARTIAL GO | Keep as candidate; not multi-repo-validated |
+| Cancellation | Pause/resume/stop/disconnect and save failure have distinct state-machine meanings | REVISE / direct mapping rejected | Current Python token remains reference-only; portable lifecycle unresolved |
+| Resource | Concrete Dataset/path/fingerprint and file-kind handling; no generic acquisition boundary | HOLD | No promotion |
+| Artifact | Model output, trainer resume state, checkpoint pairing, and history have different meanings | HOLD | No promotion |
+
+The event stream was not copied into a test fixture because doing so would
+duplicate a private implementation rather than exercise a shared boundary.
+There is no evidence for a production adapter or Surface Pack.
+
 ## Maturity rule
 
 `implemented` and `unit-tested` describe the reference package. A test-only
@@ -89,4 +106,4 @@ JavaScript observation is evidence of semantic compatibility, not a Runtime
 integration. `multi-repo-validated` requires the same meaning and change reason
 in both repositories through their real execution responsibilities. `stable`
 additionally requires unresolved REVISE/HOLD concerns to be closed; the
-second Pilot alone does not grant it.
+the second or third Pilot alone does not grant it.

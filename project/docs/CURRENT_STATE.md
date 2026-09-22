@@ -1,6 +1,6 @@
 # Current State
 
-Last verified: 2026-09-23 — KiNoTch. Runtime v0.1 portable-contract整理 and SynTrail-LM design probe complete
+Last verified: 2026-09-23 — KiNoTch. Runtime v0.1 SynTrail-LM design-probe evaluation complete
 
 ## Implemented
 
@@ -37,6 +37,8 @@ Last verified: 2026-09-23 — KiNoTch. Runtime v0.1 portable-contract整理 and 
 - SynTrail-LM design probe result: Progress is PARTIAL GO; direct
   CancellationToken mapping is REJECTED/REVISE; Resource and Artifact are HOLD.
 - No SynTrail-LM production code, Rust Runtime crate, or Surface Pack was added.
+- The SynTrail-LM Pilot report and ADR record the evidence; no Contract is
+  stable or multi-repo-validated from this design-only probe.
 
 ## Known constraints
 
@@ -56,6 +58,7 @@ Last verified: 2026-09-23 — KiNoTch. Runtime v0.1 portable-contract整理 and 
 2. Carry only Action ID and ActionError semantics as observed candidates;
    keep ActionRequest and ActionResult implementation on HOLD.
 3. Reassess maturity after a heterogeneous repository before declaring stable.
-4. Update Contract maturity and ADR from the SynTrail-LM design evidence;
-   advance only the Contract meanings that survive per-item
-   GO/PARTIAL GO/HOLD/REJECT review.
+4. Keep Progress as a narrow candidate until a second consumer or application
+   boundary exists; revise the portable cancellation lifecycle before reuse.
+5. Do not create a Rust Runtime crate or Surface Pack without repeated
+   evidence of the same meaning and change reason.
