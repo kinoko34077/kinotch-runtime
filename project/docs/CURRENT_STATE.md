@@ -1,6 +1,6 @@
 # Current State
 
-Last verified: 2026-09-22 — KiNoTch. Runtime v0.1 Pilot evaluation complete
+Last verified: 2026-09-23 — KiNoTch. Runtime v0.1 portable-contract整理 and SynTrail-LM design probe in progress
 
 ## Implemented
 
@@ -20,6 +20,7 @@ Last verified: 2026-09-22 — KiNoTch. Runtime v0.1 Pilot evaluation complete
 - Contract maturity matrix and first-Pilot ADR
 - Limited `kinotch-api` second-Pilot design with implementation hold conditions
 - Separate Python reference and cross-language Contract classifications
+- Portable semantic candidate boundary documented separately from Python types
 
 ## In progress
 
@@ -31,6 +32,8 @@ Last verified: 2026-09-22 — KiNoTch. Runtime v0.1 Pilot evaluation complete
   semantics are PARTIAL GO through a test-only plain-object probe, while
   production Runtime integration remains HOLD.
 - Language-specific bindings have not started.
+- SynTrail-LM is being inspected at its exact `origin/main` commit as a
+  design-only third Pilot; its existing dirty user worktree is not modified.
 
 ## Known constraints
 
@@ -50,3 +53,6 @@ Last verified: 2026-09-22 — KiNoTch. Runtime v0.1 Pilot evaluation complete
 2. Carry only Action ID and ActionError semantics as observed candidates;
    keep ActionRequest and ActionResult implementation on HOLD.
 3. Reassess maturity after a heterogeneous repository before declaring stable.
+4. Complete the SynTrail-LM design probe for Progress, cancellation lifecycle,
+   Resource, and Artifact; advance only the Contract meanings that survive
+   per-item GO/PARTIAL GO/HOLD/REJECT review.

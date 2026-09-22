@@ -11,7 +11,7 @@ provisional until a heterogeneous second Pilot validates the same meanings.
 
 KiNoTch. Runtime is the execution layer shared by KiNoTch. repositories. v0.1 is a small Python reference implementation for executing registered Actions and representing their common result, error, progress, resource, artifact, configuration, cancellation, and logging values.
 
-The Runtime owns execution semantics. Repository Base owns project structure, manifest, profiles, surfaces, and Runtime version references.
+The Runtime owns execution semantics. Repository Base owns project structure, manifest, profiles, surfaces, and Runtime version references. The Python types in this repository are a reference binding; the semantic candidates that may cross language boundaries are described separately in [Portable Contract](PORTABLE_CONTRACT.md).
 
 The Runtime repository owns the canonical Execution Contract definitions under
 `project/contracts/execution/`. Any matching schemas inherited under
@@ -61,6 +61,16 @@ require an error; the treatment of an error on partial results remains
 provisional until Pilot evidence exists. The result envelope and Runtime-owned
 metadata serialize to JSON-compatible values. Payload values supplied by
 Actions or callers must be JSON-compatible when serialization is required.
+
+## Portable boundary
+
+Operation identity and the minimum request/error meanings are currently
+portable candidates, not stable cross-language requirements. Field spelling,
+Python exception classes, registry dispatch, and the `CancellationToken` API
+remain implementation-specific. `ActionResult`, progress, cancellation,
+resources, and artifacts remain unresolved until heterogeneous Pilot evidence
+shows that they preserve meaning without wrapper-only conversion. See the
+[Contract Maturity Matrix](CONTRACT_MATURITY.md) for per-item decisions.
 
 ## Configuration and logging
 

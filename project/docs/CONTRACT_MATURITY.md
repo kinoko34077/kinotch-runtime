@@ -37,6 +37,26 @@ its implementation is on HOLD. Any observation must use plain objects or
 existing values where possible; it must not require a new runtime library,
 registry, framework adapter, or public API rename.
 
+## Portable semantic candidates
+
+The current portable candidate set is intentionally smaller than the Python
+reference API:
+
+| Meaning | Current position | Binding note |
+|---|---|---|
+| Operation identifier | candidate | Existing route or command identifiers may be reused; no new registry is required. |
+| Operation input | candidate | Existing validated input may be used without a transport round-trip. |
+| Request/correlation identifier | candidate | Host-provided request IDs may map to the meaning; field spelling is not fixed. |
+| Error code | candidate | Non-empty stable identifier only; uppercase/lowercase is not portable policy. |
+| Error message | candidate | Human-readable diagnostic meaning. |
+| Error details | candidate | Structured diagnostics where the host already has them. |
+| Retryability | unresolved optional candidate | Only when the host can determine the meaning without inventing provider policy. |
+
+These meanings do not require a shared package or class hierarchy. The Python
+reference names and field spelling are documented in
+[PORTABLE_CONTRACT.md](PORTABLE_CONTRACT.md), but are not the portable source
+of truth.
+
 ### Python reference only
 
 `ActionRegistry` remains useful and tested in the Python reference kernel. It
@@ -56,8 +76,11 @@ portable Contract.
 ### Defer
 
 Cancellation, progress, resources, artifacts, configuration, and logging have
-reference tests but no real second-Pilot demand. They are not removed from the
-reference implementation and are not required by the API probe.
+reference tests but no real heterogeneous-Pilot evidence yet. They are not
+removed from the reference implementation and are not required by the API
+probe. The SynTrail-LM design probe will inspect only the existing meanings of
+Progress, cancellation lifecycle, Resource, and Artifact; it will not add a
+Rust Runtime crate by default.
 
 ## Maturity rule
 
