@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from typing import Any, Mapping
 
 from .errors import ActionError
+from .resources import Artifact
 
 
 _STATUSES = {"success", "partial", "failed", "cancelled"}
@@ -14,7 +15,7 @@ class ActionResult:
     status: str
     data: Any = None
     error: ActionError | None = None
-    artifacts: tuple[Mapping[str, Any], ...] = ()
+    artifacts: tuple[Artifact, ...] = ()
     warnings: tuple[str, ...] = ()
     metrics: Mapping[str, Any] = field(default_factory=dict)
 
@@ -29,7 +30,7 @@ class ActionResult:
         cls,
         data: Any = None,
         *,
-        artifacts: tuple[Mapping[str, Any], ...] = (),
+        artifacts: tuple[Artifact, ...] = (),
         warnings: tuple[str, ...] = (),
         metrics: Mapping[str, Any] | None = None,
     ) -> "ActionResult":
@@ -60,7 +61,7 @@ class ActionResult:
         if self.error is not None:
             payload["error"] = self.error.to_dict()
         if self.artifacts:
-            payload["artifacts"] = [dict(artifact) for artifact in self.artifacts]
+            payload["artifacts"] = [artifact.to_dict() for artifact in self.artifacts]
         if self.warnings:
             payload["warnings"] = list(self.warnings)
         if self.metrics:

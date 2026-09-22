@@ -4,6 +4,23 @@ from dataclasses import dataclass
 from typing import Any
 
 
+_RESOURCE_KINDS = {
+    "file",
+    "directory",
+    "url",
+    "text",
+    "binary",
+    "object",
+}
+_RESOURCE_ACCESS = {"read", "write", "read-write"}
+_ARTIFACT_KINDS = {
+    "file",
+    "directory",
+    "structured-data",
+    "external-reference",
+}
+
+
 @dataclass(frozen=True)
 class Resource:
     kind: str
@@ -11,6 +28,12 @@ class Resource:
     mime: str | None = None
     name: str | None = None
     access: str | None = None
+
+    def __post_init__(self) -> None:
+        if self.kind not in _RESOURCE_KINDS:
+            raise ValueError(f"unsupported resource kind: {self.kind}")
+        if self.access is not None and self.access not in _RESOURCE_ACCESS:
+            raise ValueError(f"unsupported resource access: {self.access}")
 
     def to_dict(self) -> dict[str, Any]:
         payload: dict[str, Any] = {"kind": self.kind}
@@ -28,6 +51,10 @@ class Artifact:
     url: str | None = None
     mime: str | None = None
     label: str | None = None
+
+    def __post_init__(self) -> None:
+        if self.kind not in _ARTIFACT_KINDS:
+            raise ValueError(f"unsupported artifact kind: {self.kind}")
 
     def to_dict(self) -> dict[str, str]:
         payload: dict[str, str] = {"kind": self.kind}

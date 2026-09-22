@@ -8,6 +8,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from kinotch_runtime.config import RuntimeConfig
 from kinotch_runtime.errors import ActionError
+from kinotch_runtime.kernel import ActionRegistry
 from kinotch_runtime.logging import get_logger
 from kinotch_runtime.progress import ProgressEvent, ProgressReporter
 from kinotch_runtime.resources import Artifact, Resource
@@ -47,6 +48,22 @@ class ContractValueTests(unittest.TestCase):
         self.assertEqual("failed", failure.status)
         self.assertEqual("NOT_FOUND", failure.to_dict()["error"]["code"])
 
+    def test_failed_and_cancelled_results_require_errors(self):
+        with self.assertRaises(ValueError):
+            ActionResult(status="failed")
+        with self.assertRaises(ValueError):
+            ActionResult(status="cancelled")
+
+    def test_artifact_integrates_with_result_and_json_serialization(self):
+        artifact = Artifact(kind="file", path="out/report.json")
+        result = ActionResult.success(artifacts=(artifact,))
+
+        self.assertEqual(
+            {"kind": "file", "path": "out/report.json"},
+            result.to_dict()["artifacts"][0],
+        )
+        json.dumps(result.to_dict())
+
     def test_progress_reporter_delivers_json_compatible_event(self):
         received = []
         reporter = ProgressReporter(received.append)
@@ -78,6 +95,41 @@ class ContractValueTests(unittest.TestCase):
         self.assertEqual("text", resource.to_dict()["kind"])
         self.assertEqual("out/report.json", artifact.to_dict()["path"])
         json.dumps({"resource": resource.to_dict(), "artifact": artifact.to_dict()})
+
+    def test_resource_rejects_unknown_kind_and_access(self):
+        with self.assertRaises(ValueError):
+            Resource(kind="banana")
+        with self.assertRaises(ValueError):
+            Resource(kind="file", access="banana")
+
+    def test_artifact_rejects_unknown_kind(self):
+        with self.assertRaises(ValueError):
+            Artifact(kind="banana")
+
+    def test_action_registry_validates_ids_and_duplicates(self):
+        registry = ActionRegistry()
+        registry.register("sample.echo", lambda request, context: ActionResult.success())
+
+        with self.assertRaises(ValueError):
+            registry.register("!!!", lambda request, context: ActionResult.success())
+        with self.assertRaises(ValueError):
+            registry.register("Hello World", lambda request, context: ActionResult.success())
+        with self.assertRaises(ValueError):
+            registry.register("sample.echo", lambda request, context: ActionResult.success())
+
+    def test_runtime_result_schema_declares_error(self):
+        schema_path = (
+            Path(__file__).resolve().parents[1]
+            / "contracts"
+            / "execution"
+            / "result.schema.json"
+        )
+        schema = json.loads(schema_path.read_text(encoding="utf-8"))
+
+        self.assertEqual(
+            {"$ref": "error.schema.json"},
+            schema["properties"]["error"],
+        )
 
     def test_config_requires_explicit_reads(self):
         config = RuntimeConfig({"workers": 2})

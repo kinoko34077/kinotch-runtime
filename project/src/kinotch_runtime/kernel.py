@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass, field
 import logging
+import re
 from typing import Any, Callable
 
 from .config import RuntimeConfig
@@ -49,6 +50,7 @@ class ActionContext:
 
 
 ActionHandler = Callable[[ActionRequest, ActionContext], ActionResult]
+_ACTION_ID = re.compile(r"^[a-z0-9_.-]+$")
 
 
 class ActionRegistry:
@@ -56,8 +58,8 @@ class ActionRegistry:
         self._handlers: dict[str, ActionHandler] = {}
 
     def register(self, action_id: str, handler: ActionHandler) -> None:
-        if not action_id:
-            raise ValueError("action_id must not be empty")
+        if not isinstance(action_id, str) or not _ACTION_ID.fullmatch(action_id):
+            raise ValueError("action_id must match ^[a-z0-9_.-]+$")
         if action_id in self._handlers:
             raise ValueError(f"Action is already registered: {action_id}")
         self._handlers[action_id] = handler
