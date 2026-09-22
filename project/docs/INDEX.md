@@ -11,6 +11,8 @@
 - [kinotch-api Pilot Design](PILOT_KINOTCH_API.md)
 - [jev-audit Pilot ADR](adr/0001-jev-audit-pilot-contract-evaluation.md)
 - [SynTrail-LM Pilot ADR](adr/0003-syntrail-runtime-pilot-evaluation.md)
+- [standby-display Pilot ADR](adr/0004-standby-display-runtime-pilot-evaluation.md)
+- [dev_agent Pilot ADR](adr/0005-dev-agent-runtime-pilot-evaluation.md)
 - [Execution Contract](../contracts/execution/README.md)
 - [Implementation Plan](../../docs/superpowers/plans/2026-09-22-runtime-v01.md)
 - [Base Runtime Integration](../../.kinotch/RUNTIME_INTEGRATION.md)

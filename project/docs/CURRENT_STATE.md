@@ -1,6 +1,6 @@
 # Current State
 
-Last verified: 2026-09-23 — KiNoTch. Runtime v0.1 SynTrail-LM design-probe evaluation complete
+Last verified: 2026-09-23 — KiNoTch. Runtime v0.1 fourth/fifth Pilot design-probe evaluation complete
 
 ## Implemented
 
@@ -39,6 +39,13 @@ Last verified: 2026-09-23 — KiNoTch. Runtime v0.1 SynTrail-LM design-probe eva
 - No SynTrail-LM production code, Rust Runtime crate, or Surface Pack was added.
 - The SynTrail-LM Pilot report and ADR record the evidence; no Contract is
   stable or multi-repo-validated from this design-only probe.
+- `standby-display` fourth design probe recorded generated artifact/hash/stale
+  checking as Project/tooling-specific; its stale vendor check was observed and
+  not repaired by this Runtime task.
+- `dev_agent` fifth design probe kept AgentBackend authority/reconciliation and
+  ResourceLedger semantics local. Artifact reference metadata is a narrow
+  PARTIAL GO candidate; cancellation remains REVISE and no production code or
+  binding was added.
 
 ## Known constraints
 
@@ -62,3 +69,6 @@ Last verified: 2026-09-23 — KiNoTch. Runtime v0.1 SynTrail-LM design-probe eva
    boundary exists; revise the portable cancellation lifecycle before reuse.
 5. Do not create a Rust Runtime crate or Surface Pack without repeated
    evidence of the same meaning and change reason.
+6. Compare the narrow artifact-reference candidate with another real consumer
+   only if it preserves the same identity-versus-authority distinction; do not
+   promote it or create a package from one Agent implementation.

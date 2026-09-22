@@ -85,7 +85,8 @@ until another repository demonstrates the same meaning and change reason:
 - Progress events and reporters
 - cancellation lifecycle
 - Resource
-- Artifact
+- Artifact, except for a narrow artifact-reference identity/metadata candidate
+  that is not stable or multi-repo-validated
 - RuntimeConfig
 - logging boundary
 

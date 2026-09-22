@@ -99,6 +99,25 @@ The event stream was not copied into a test fixture because doing so would
 duplicate a private implementation rather than exercise a shared boundary.
 There is no evidence for a production adapter or Surface Pack.
 
+## Fourth and fifth Pilot evidence
+
+The fourth and fifth roadmap candidates were also design-only probes. They were
+inspected in isolated worktrees at exact refs; neither user worktree was
+modified and no external provider or deployment path was used.
+
+| Repository | Contract observation | Decision | Maturity effect |
+|---|---|---|---|
+| `standby-display` | Source-owned generated vendor files, recorded hashes, and stale/build gates | HOLD | Generated artifact integrity remains Project/tooling-specific |
+| `dev_agent` | Durable AgentBackend request/event/result boundary with explicit authority and reconciliation | HOLD as Runtime integration | AgentBackend remains Agent-specific |
+| `dev_agent` | Narrow artifact reference metadata separates identity from access/verification authority | PARTIAL GO candidate | Candidate sub-meaning only; not multi-repo-validated or stable |
+| `dev_agent` | Cancellation request, task stop, unknown external outcome, and reconciliation are distinct | REVISE | Current portable cancellation model remains unresolved |
+| `dev_agent` | ResourceLedger owns quota, budget, privacy, qualification, health, repair, and routing | REJECT/HOLD | Do not promote Agent authority to Runtime Resource |
+
+The `standby-display` stale check was intentionally not repaired by syncing
+generated files. The `dev_agent` probe did not add a copied test fixture because
+its existing AgentBackend tests already exercise the local contract and a
+fixture would not validate cross-repository reuse.
+
 ## Maturity rule
 
 `implemented` and `unit-tested` describe the reference package. A test-only
