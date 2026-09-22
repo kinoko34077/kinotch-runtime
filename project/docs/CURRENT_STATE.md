@@ -1,6 +1,6 @@
 # Current State
 
-Last verified: 2026-09-22 — KiNoTch. Runtime v0.1 provisional Contract alignment
+Last verified: 2026-09-22 — KiNoTch. Runtime v0.1 Pilot-ready provisional state
 
 ## Implemented
 
@@ -15,11 +15,14 @@ Last verified: 2026-09-22 — KiNoTch. Runtime v0.1 provisional Contract alignme
 - Standard-library logging adapter
 - Contract-focused unit tests
 - Provisional Contract status and Runtime-owned Execution Contract boundary
+- Canonical Execution Contract schemas under `project/contracts/execution/`
+- `jev-audit` optional `repo.audit` bridge validated through the Runtime kernel
 
 ## In progress
 
-- Runtime Contract alignment is in progress before the first Pilot integration.
-- First Pilot integration in `jev-audit` has not started.
+- Runtime Contract alignment is complete for the current v0.1 reference scope.
+- The first `jev-audit` Pilot bridge is implemented and locally validated.
+- A live Jev API audit and cross-repository Pilot evaluation have not started.
 - Language-specific bindings have not started.
 
 ## Known constraints
@@ -35,7 +38,7 @@ Last verified: 2026-09-22 — KiNoTch. Runtime v0.1 provisional Contract alignme
 
 ## Next work
 
-1. Complete Runtime-owned Execution Contract alignment and regression tests.
-2. Integrate the Runtime into `jev-audit` without changing its Audit Core.
-3. Compare CLI JSON output, exit codes, errors, and MCP adapter complexity.
-4. Record Pilot findings before adding Surface Packs or language bindings.
+1. Run an operator-authorized live `jev-audit` CLI/MCP comparison without
+   changing its Audit Core.
+2. Measure duplication, adapter size, config mapping, and error/result changes.
+3. Record Pilot findings before adding Surface Packs or language bindings.
