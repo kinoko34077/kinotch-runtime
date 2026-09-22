@@ -1,6 +1,6 @@
 # jev-audit Pilot Report
 
-Status: preparation complete — live Jev validation pending
+Status: live CLI/MCP comparison complete — Contract evaluation pending
 
 ## Scope
 
@@ -18,7 +18,15 @@ their existing Surface code and call the same bridge entry point.
 - With the Runtime source on `PYTHONPATH`, the bridge test passes through the
   actual `ActionRegistry` and `repo.audit` handler without an external API
   call.
-- The bridge is 65 lines and its focused regression test is 78 lines.
+- A live Direct CLI run and a live Runtime CLI run both processed 14 files in
+  2 batches, returned `review`, and exited 0. Both used `jev-1.13.0` and the
+  same token counts; risk probabilities differed slightly between requests.
+- A live MCP `audit_directory` call returned `CallToolResult` with
+  `isError=false`, `review`, 14 files, and 2 batches through the Runtime
+  bridge.
+- An invalid profile kept exit code 2. The Runtime bridge mapped the expected
+  missing-profile error to `NOT_FOUND` instead of exposing a traceback.
+- The bridge is 83 lines and its focused regression test is 103 lines.
 - The Pilot adds no CLI/MCP Surface Pack, plugin discovery, or Action Registry
   auto-binding.
 
@@ -30,18 +38,20 @@ their existing Surface code and call the same bridge entry point.
   Runtime result. It does not claim that arbitrary domain payloads are JSON
   serializable; the Runtime envelope contract keeps that responsibility with
   the caller.
-- Runtime errors remain structured inside the bridge and are raised at the
-  existing application boundary; CLI/MCP Surface error presentation is not
+- Expected input/configuration errors are mapped to structured `NOT_FOUND` or
+  `INVALID_INPUT` errors inside the bridge. Unexpected provider or execution
+  errors remain Runtime-redacted. CLI/MCP Surface error presentation is not
   standardized by this Pilot.
 
-## Pending live evaluation
+## Remaining evaluation
 
-A live Jev audit has not been run in this preparation phase because it would
-send repository content to the external TypeSafe service and requires an
-operator-authorized `TYPESAFE_API_KEY`. Before doing so, compare the existing
-direct path and the Runtime path for CLI JSON output, exit codes, error
-handling, MCP results, config mapping, added dependencies, and adapter
-complexity. Do not treat a GREEN audit as a quality proof.
+The live comparison used an operator-authorized `TYPESAFE_API_KEY` and sent
+the selected `jev_audit` source files to TypeSafe. The current evidence covers
+CLI/MCP result shape, exit codes, basic error mapping, and Runtime execution.
+It does not prove that the Runtime reduces maintenance work. Compare adapter
+size, config mapping, dependency/install cost, and repeated change reasons
+before declaring a stable cross-repository Contract. Do not treat a GREEN
+audit as a quality proof.
 
 The Pilot must fail or revise the Runtime boundary if the adapter grows,
 configuration becomes more complex, or CLI/MCP-specific behavior leaks into

@@ -1,6 +1,6 @@
 # Current State
 
-Last verified: 2026-09-22 — KiNoTch. Runtime v0.1 Pilot-ready provisional state
+Last verified: 2026-09-22 — KiNoTch. Runtime v0.1 Pilot comparison complete
 
 ## Implemented
 
@@ -21,8 +21,9 @@ Last verified: 2026-09-22 — KiNoTch. Runtime v0.1 Pilot-ready provisional stat
 ## In progress
 
 - Runtime Contract alignment is complete for the current v0.1 reference scope.
-- The first `jev-audit` Pilot bridge is implemented and locally validated.
-- A live Jev API audit and cross-repository Pilot evaluation have not started.
+- The first `jev-audit` Pilot bridge is implemented and live CLI/MCP comparison
+  has completed.
+- Cross-repository Contract evaluation remains provisional.
 - Language-specific bindings have not started.
 
 ## Known constraints
@@ -38,7 +39,7 @@ Last verified: 2026-09-22 — KiNoTch. Runtime v0.1 Pilot-ready provisional stat
 
 ## Next work
 
-1. Run an operator-authorized live `jev-audit` CLI/MCP comparison without
-   changing its Audit Core.
+1. Evaluate the live Pilot evidence and decide whether the provisional
+   Contract should be revised.
 2. Measure duplication, adapter size, config mapping, and error/result changes.
-3. Record Pilot findings before adding Surface Packs or language bindings.
+3. Record the decision before adding Surface Packs or language bindings.
