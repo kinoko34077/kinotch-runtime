@@ -1,9 +1,4 @@
 {
   "schema_version": 1,
-  "actions": [
-    {
-      "id": "runtime.health",
-      "summary": "Return a successful Runtime health result."
-    }
-  ]
+  "actions": []
 }

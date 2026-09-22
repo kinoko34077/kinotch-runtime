@@ -42,7 +42,8 @@
     "source": "src/",
     "tests": "tests/",
     "actions": "contracts/actions.json",
-    "surfaces": "contracts/surfaces.json"
+    "surfaces": "contracts/surfaces.json",
+    "execution": "contracts/execution/"
   },
   "notes": [
     "Runtime v0.1 is a Python reference implementation for the first jev-audit Pilot.",
