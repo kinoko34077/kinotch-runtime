@@ -1,6 +1,6 @@
 # jev-audit Pilot Report
 
-Status: live CLI/MCP comparison complete — Contract evaluation pending
+Status: evaluation complete — Runtime remains provisional
 
 ## Scope
 
@@ -9,7 +9,7 @@ The first Pilot connects `jev-audit` to the Runtime through one optional
 directory scanning, batching, Jev calls, and aggregation. CLI and MCP keep
 their existing Surface code and call the same bridge entry point.
 
-## Validated locally
+## Evidence
 
 - Runtime Contract tests pass, including Action ID, Resource, Artifact,
   Result, and cancellation invariants.
@@ -26,7 +26,7 @@ their existing Surface code and call the same bridge entry point.
   bridge.
 - An invalid profile kept exit code 2. The Runtime bridge mapped the expected
   missing-profile error to `NOT_FOUND` instead of exposing a traceback.
-- The bridge is 83 lines and its focused regression test is 103 lines.
+- The bridge is 83 lines and its focused regression test is 116 lines.
 - The Pilot adds no CLI/MCP Surface Pack, plugin discovery, or Action Registry
   auto-binding.
 
@@ -43,14 +43,41 @@ their existing Surface code and call the same bridge entry point.
   errors remain Runtime-redacted. CLI/MCP Surface error presentation is not
   standardized by this Pilot.
 
-## Remaining evaluation
+## What worked
 
-The live comparison used an operator-authorized `TYPESAFE_API_KEY` and sent
-the selected `jev_audit` source files to TypeSafe. The current evidence covers
-CLI/MCP result shape, exit codes, basic error mapping, and Runtime execution.
-It does not prove that the Runtime reduces maintenance work. Compare adapter
-size, config mapping, dependency/install cost, and repeated change reasons
-before declaring a stable cross-repository Contract. Do not treat a GREEN
+- The Audit Core remained unchanged.
+- CLI and MCP used one localized bridge while the default installation retained
+  the legacy path.
+- `ActionRequest`, `ActionRegistry`, and the `ActionError` mapping were usable
+  without moving CLI/MCP policy into the Runtime kernel.
+- Expected missing-profile input retained exit code 2 and became a structured
+  `NOT_FOUND` error on the Runtime path.
+
+## What did not reduce complexity
+
+- CLI and MCP already shared the Audit Core before the Pilot; Runtime did not
+  create that sharing.
+- `ActionResult` was only a transparent in-process wrapper around an
+  `AuditReport` domain object. It was unwrapped before CLI/MCP output and did
+  not provide a shared serialized result envelope.
+- `RuntimeConfig`, progress, cancellation, resources, artifacts, and logging
+  were not needed by the actual audit path.
+- The optional Git dependency and bridge add concepts without a measured LOC
+  or maintenance reduction in this one repository.
+
+## Contract decisions
+
+See [CONTRACT_MATURITY.md](CONTRACT_MATURITY.md) and
+[ADR 0001](adr/0001-jev-audit-pilot-contract-evaluation.md). No Contract is
+promoted to `stable` or `multi-repo-validated` from this Pilot alone.
+
+## Remaining validation
+
+The live comparison used an operator-authorized `TYPESAFE_API_KEY` and sent the
+selected `jev_audit` source files to TypeSafe. It covers CLI/MCP result shape,
+exit codes, basic error mapping, and Runtime execution. It does not validate
+Config, Progress, Cancellation, Resource, Artifact, or Logging semantics, and
+does not prove that Runtime reduces maintenance work. Do not treat a GREEN
 audit as a quality proof.
 
 The Pilot must fail or revise the Runtime boundary if the adapter grows,

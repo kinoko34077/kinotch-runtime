@@ -1,6 +1,6 @@
 # Current State
 
-Last verified: 2026-09-22 — KiNoTch. Runtime v0.1 Pilot comparison complete
+Last verified: 2026-09-22 — KiNoTch. Runtime v0.1 Pilot evaluation complete
 
 ## Implemented
 
@@ -17,13 +17,17 @@ Last verified: 2026-09-22 — KiNoTch. Runtime v0.1 Pilot comparison complete
 - Provisional Contract status and Runtime-owned Execution Contract boundary
 - Canonical Execution Contract schemas under `project/contracts/execution/`
 - `jev-audit` optional `repo.audit` bridge validated through the Runtime kernel
+- Contract maturity matrix and first-Pilot ADR
+- Limited `kinotch-api` second-Pilot design with implementation hold conditions
 
 ## In progress
 
 - Runtime Contract alignment is complete for the current v0.1 reference scope.
 - The first `jev-audit` Pilot bridge is implemented and live CLI/MCP comparison
   has completed.
-- Cross-repository Contract evaluation remains provisional.
+- First-Pilot Contract evaluation is complete; no Contract is stable yet.
+- `kinotch-api` is GO for design-only investigation and HOLD for implementation
+  until an HTTP-native boundary is shown to be natural.
 - Language-specific bindings have not started.
 
 ## Known constraints
@@ -39,7 +43,8 @@ Last verified: 2026-09-22 — KiNoTch. Runtime v0.1 Pilot comparison complete
 
 ## Next work
 
-1. Evaluate the live Pilot evidence and decide whether the provisional
-   Contract should be revised.
-2. Measure duplication, adapter size, config mapping, and error/result changes.
-3. Record the decision before adding Surface Packs or language bindings.
+1. Run the limited `kinotch-api` second-Pilot design probe if its boundary
+   remains natural after review.
+2. Keep only the evaluated Action/Request/Error meanings in the next Pilot;
+   defer unused execution contracts.
+3. Reassess maturity after a heterogeneous repository before declaring stable.

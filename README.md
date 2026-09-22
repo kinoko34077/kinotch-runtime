@@ -12,6 +12,9 @@ python -m unittest discover -s project/tests -v
 .\knt.cmd verify
 ```
 
-The first integration target is `jev-audit`. Pilot work will remain in that repository; this Runtime repository is the execution-contract source.
+The first integration Pilot is `jev-audit`. Its CLI/MCP live comparison is
+complete, but the Contract remains provisional because one Python repository is
+not enough for cross-repository stability. Pilot evaluation and the limited
+`kinotch-api` second-Pilot design are recorded in the Runtime documentation.
 
 See [the specification](project/docs/SPEC.md) and [current state](project/docs/CURRENT_STATE.md).
