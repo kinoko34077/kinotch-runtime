@@ -1,3 +1,7 @@
+param(
+    [Alias('Root')][string]$BaseRoot
+)
+
 function ConvertTo-BaseRelativePath {
     param(
         [Parameter(Mandatory=$true)][string]$Root,
@@ -102,6 +106,6 @@ function Update-BaseIndex {
     [IO.File]::WriteAllText((Join-Path $Root ".kinotch/base-files.json"), $json + [Environment]::NewLine, (New-Object System.Text.UTF8Encoding($false)))
 }
 
-if ($PSBoundParameters.ContainsKey("Root")) {
-    Update-BaseIndex -Root $Root
+if (-not [string]::IsNullOrWhiteSpace($BaseRoot)) {
+    Update-BaseIndex -Root $BaseRoot
 }

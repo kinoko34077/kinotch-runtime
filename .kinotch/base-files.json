@@ -48,7 +48,7 @@
     },
     {
       "path": ".kinotch/RUNTIME_INTEGRATION.md",
-      "sha256": "3981108ca35ea4ac7cbb2dd4015b2dd0865cd303b1889f8c76f02088e9adda1c"
+      "sha256": "eca9d98d19424a146c5dd0ba0b0ac2d3f0a66826ecb82ec592cb2170101b7e89"
     },
     {
       "path": ".kinotch/docs/BASE_ROADMAP.md",
@@ -156,7 +156,7 @@
     },
     {
       "path": ".kinotch/scripts/update-base-index.ps1",
-      "sha256": "5858db57c1994f9ce350b7b701a375fbd0a8a9dcec6dbcbd1facae9711429485"
+      "sha256": "5e2af31c285be96a9bdc2ce91dd705c6be60d187f1be3ebacd008ecfb435ee4c"
     },
     {
       "path": ".kinotch/templates/ADR.md",
