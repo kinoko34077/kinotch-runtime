@@ -22,6 +22,12 @@ Python Reference Runtimeの実装型と、異なる言語・Surfaceで成立す�
 5. 自然な対応があるContractだけtest-only probeを実施し、production codeは必要性が証明された場合に限り変更する。
 6. Pilot評価とContract maturityを更新し、Surface Pack着手可否を明記する。
 7. Runtime / Base / 必要なPilot repoを検証し、段階ごとにcommit・pushしてlocal HEADとremoteを確認する。
+8. Roadmapの第4候補 `standby-display` を generated artifact / hash / stale
+   checkのdesign-only Probeとして評価する。stale生成物は無断同期しない。
+9. Roadmapの第5候補 `dev_agent` を exact `origin/v2/bootstrap` の隔離環境で
+   AgentBackend / event / cancellation / artifact-reference境界として評価する。
+10. 第4・第5候補で共通意味が繰り返された場合だけ、portable sub-contract候補を
+    更新する。Surface Packやproduction integrationは別Gateで判定する。
 
 ## 完了条件
 

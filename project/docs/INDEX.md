@@ -6,6 +6,8 @@
 - [Contract Maturity](CONTRACT_MATURITY.md)
 - [Portable Contract](PORTABLE_CONTRACT.md)
 - [SynTrail-LM Pilot Design](PILOT_SYNTRAIL.md)
+- [standby-display Pilot Design](PILOT_STANDBY_DISPLAY.md)
+- [dev_agent Pilot Design](PILOT_DEV_AGENT.md)
 - [kinotch-api Pilot Design](PILOT_KINOTCH_API.md)
 - [jev-audit Pilot ADR](adr/0001-jev-audit-pilot-contract-evaluation.md)
 - [SynTrail-LM Pilot ADR](adr/0003-syntrail-runtime-pilot-evaluation.md)
