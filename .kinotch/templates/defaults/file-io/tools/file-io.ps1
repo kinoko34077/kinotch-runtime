@@ -6,14 +6,15 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+$repositoryRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot "../.."))
+. (Join-Path $repositoryRoot ".kinotch/scripts/path-containment.ps1")
 if ([IO.Path]::IsPathRooted($Path)) {
     Write-Error "File path must be relative to the Project root"
     exit 1
 }
 $rootPath = [IO.Path]::GetFullPath($Root).TrimEnd([char[]]@("/", "\"))
-$rootPrefix = $rootPath + [IO.Path]::DirectorySeparatorChar
 $resolved = [IO.Path]::GetFullPath((Join-Path $rootPath $Path))
-if (-not $resolved.StartsWith($rootPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+if (-not (Test-KntProjectPathContained -Root $rootPath -Candidate $resolved)) {
     Write-Error "File path is outside the Project root"
     exit 1
 }

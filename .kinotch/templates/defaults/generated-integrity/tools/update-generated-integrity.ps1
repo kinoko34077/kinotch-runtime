@@ -6,18 +6,19 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+$repositoryRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot "../.."))
+. (Join-Path $repositoryRoot ".kinotch/scripts/path-containment.ps1")
 $configPath = Join-Path $Root "generated-integrity.json"
 if ([IO.Path]::IsPathRooted($Artifact) -or [IO.Path]::IsPathRooted($Source)) {
     throw "Generated source and artifact paths must be relative to the Project root"
 }
 $rootPath = [IO.Path]::GetFullPath($Root).TrimEnd([char[]]@("/", "\"))
-$rootPrefix = $rootPath + [IO.Path]::DirectorySeparatorChar
 $artifactPath = [IO.Path]::GetFullPath((Join-Path $rootPath $Artifact))
 $sourcePath = [IO.Path]::GetFullPath((Join-Path $rootPath $Source))
-if (-not $artifactPath.StartsWith($rootPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+if (-not (Test-KntProjectPathContained -Root $rootPath -Candidate $artifactPath)) {
     throw "Generated artifact path is outside the Project root: $Artifact"
 }
-if (-not $sourcePath.StartsWith($rootPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+if (-not (Test-KntProjectPathContained -Root $rootPath -Candidate $sourcePath)) {
     throw "Generated source path is outside the Project root: $Source"
 }
 if (-not (Test-Path -LiteralPath $artifactPath -PathType Leaf)) { throw "Generated artifact not found: $Artifact" }

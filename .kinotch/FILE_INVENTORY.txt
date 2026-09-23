@@ -40,6 +40,7 @@
 .kinotch/schemas/surface.schema.json
 .kinotch/scripts/knt-validation.ps1
 .kinotch/scripts/knt.ps1
+.kinotch/scripts/path-containment.ps1
 .kinotch/scripts/update-base-index.ps1
 .kinotch/templates/ADR.md
 .kinotch/templates/CURRENT_STATE.md

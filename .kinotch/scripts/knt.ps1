@@ -510,11 +510,11 @@ function Write-KntJsonFile([string]$Path, $Value) {
     [IO.File]::WriteAllText($Path, $json + [Environment]::NewLine, (New-Object System.Text.UTF8Encoding($false)))
 }
 
-function Copy-DefaultImplementation([string]$DefaultId, [string]$ProjectRoot, [string]$Kind = "Tool", [System.Collections.Generic.List[string]]$ConflictingDefaults) {
-    Assert-RepositoryWriteAllowed "Default materialization"
+function Get-DefaultImplementationPlan([string]$DefaultId, [string]$ProjectRoot, [string]$Kind = "Tool") {
     $templateRoot = Join-Path $BaseDir ("templates/defaults/" + $DefaultId)
-    if (-not (Test-Path -LiteralPath $templateRoot -PathType Container)) { return }
-    foreach ($templateFile in @(Get-ChildItem -LiteralPath $templateRoot -Recurse -File -Force)) {
+    if (-not (Test-Path -LiteralPath $templateRoot -PathType Container)) { return @() }
+    $plan = New-Object System.Collections.Generic.List[object]
+    foreach ($templateFile in @(Get-ChildItem -LiteralPath $templateRoot -Recurse -File -Force | Sort-Object FullName)) {
         $relative = ConvertTo-BaseRelativePath -Root $templateRoot -AbsolutePath $templateFile.FullName
         if ($relative -like ".github/*") {
             $destination = Join-Path $Root $relative
@@ -522,27 +522,53 @@ function Copy-DefaultImplementation([string]$DefaultId, [string]$ProjectRoot, [s
         else {
             $destination = Join-Path $ProjectRoot $relative
         }
+        $status = "MISSING"
         if (Test-Path -LiteralPath $destination) {
             $sameContent = $false
             try {
-                $sameContent = (Get-BaseFileHash -Path $templateFile.FullName) -eq (Get-BaseFileHash -Path $destination)
+                $sameContent = (Test-Path -LiteralPath $destination -PathType Leaf) -and ((Get-BaseFileHash -Path $templateFile.FullName) -eq (Get-BaseFileHash -Path $destination))
             }
             catch {
                 $sameContent = $false
             }
-            if ($sameContent) {
-                Write-Knt "$Kind Default '$DefaultId' preserved identical path: $relative"
-            }
-            else {
-                if ($null -ne $ConflictingDefaults -and $DefaultId -notin $ConflictingDefaults) { [void]$ConflictingDefaults.Add($DefaultId) }
-                Write-Knt "$Kind Default '$DefaultId' found conflicting existing path: $relative; state OVERRIDE"
-            }
+            $status = if ($sameContent) { "IDENTICAL" } else { "CONFLICT" }
+        }
+        [void]$plan.Add([pscustomobject]@{
+            default_id = $DefaultId
+            kind = $Kind
+            relative = $relative
+            template = $templateFile.FullName
+            destination = $destination
+            status = $status
+        })
+    }
+    return @($plan.ToArray())
+}
+
+function Apply-DefaultImplementationPlan($Plan, [System.Collections.Generic.List[string]]$ConflictingDefaults) {
+    $planItems = @($Plan | Where-Object { $null -ne $_ })
+    if ($planItems.Count -eq 0) { return }
+    Assert-RepositoryWriteAllowed "Default materialization"
+    $defaultId = [string]$planItems[0].default_id
+    $kind = [string]$planItems[0].kind
+    $conflicts = @($planItems | Where-Object { [string]$_.status -eq "CONFLICT" })
+    if ($conflicts.Count -gt 0) {
+        if ($null -ne $ConflictingDefaults -and $defaultId -notin $ConflictingDefaults) { [void]$ConflictingDefaults.Add($defaultId) }
+        foreach ($conflict in $conflicts) {
+            Write-Knt "$kind Default '$defaultId' found conflicting existing path: $($conflict.relative); state OVERRIDE"
+        }
+        Write-Knt "$kind Default '$defaultId' no Default files were materialized because the implementation plan contains conflicts"
+        return
+    }
+    foreach ($item in $planItems) {
+        if ([string]$item.status -eq "IDENTICAL") {
+            Write-Knt "$kind Default '$defaultId' preserved identical path: $($item.relative)"
             continue
         }
-        $parent = Split-Path -Parent $destination
+        $parent = Split-Path -Parent $item.destination
         New-Item -ItemType Directory -Path $parent -Force | Out-Null
-        Copy-Item -LiteralPath $templateFile.FullName -Destination $destination -Force
-        Write-Knt "$Kind Default '$DefaultId' added: $relative"
+        Copy-Item -LiteralPath $item.template -Destination $item.destination -Force
+        Write-Knt "$kind Default '$defaultId' added: $($item.relative)"
     }
 }
 
@@ -636,11 +662,13 @@ function Invoke-Init {
             if ($surface.Name -notin $surfaceNames) { [void]$surfaceNames.Add([string]$surface.Name) }
         }
         $defaults.packs | Add-Member -NotePropertyName ([string]$profileEntry.id) -NotePropertyValue (Get-DefaultStateEntry "DEFAULT") -Force
-        Copy-DefaultImplementation -DefaultId ([string]$profileEntry.id) -ProjectRoot $projectRoot -Kind "Surface" -ConflictingDefaults $conflictingDefaults
+        $plan = Get-DefaultImplementationPlan -DefaultId ([string]$profileEntry.id) -ProjectRoot $projectRoot -Kind "Surface"
+        Apply-DefaultImplementationPlan -Plan $plan -ConflictingDefaults $conflictingDefaults
     }
     foreach ($toolEntry in $toolEntries) {
         $defaults.packs | Add-Member -NotePropertyName ([string]$toolEntry.id) -NotePropertyValue (Get-DefaultStateEntry "DEFAULT") -Force
-        Copy-DefaultImplementation -DefaultId ([string]$toolEntry.id) -ProjectRoot $projectRoot -ConflictingDefaults $conflictingDefaults
+        $plan = Get-DefaultImplementationPlan -DefaultId ([string]$toolEntry.id) -ProjectRoot $projectRoot -Kind "Tool"
+        Apply-DefaultImplementationPlan -Plan $plan -ConflictingDefaults $conflictingDefaults
     }
     foreach ($conflictingDefault in @($conflictingDefaults | Select-Object -Unique)) {
         $defaults.packs.$conflictingDefault.state = "OVERRIDE"
@@ -677,7 +705,18 @@ function Invoke-Migrate($Manifest) {
     $toolEntries = @(Get-MigrateToolEntries -Manifest $Manifest -Catalog $catalog -Options $options -Shape $shape)
     $selectedSurfaceValues = @($profileEntries | ForEach-Object { @($_.compatible_surfaces) } | Select-Object -Unique)
     if ($Manifest) {
-        $selectedSurfaceValues = @($selectedSurfaceValues + @(Get-ManifestSurfaceIds -Manifest $Manifest) | Select-Object -Unique)
+        $manifestSurfaceIds = @(Get-ManifestSurfaceIds -Manifest $Manifest)
+        $selectedSurfaceValues = @($selectedSurfaceValues + $manifestSurfaceIds | Select-Object -Unique)
+        foreach ($profileEntry in @($profileEntries)) {
+            $requiredSurfaces = @($profileEntry.compatible_surfaces)
+            if ($requiredSurfaces.Count -eq 0) { continue }
+            $enabled = @($requiredSurfaces | Where-Object { $_ -in $manifestSurfaceIds }).Count -gt 0
+            if (-not $enabled) {
+                $surfaceWarning = "Surface Default '$($profileEntry.id)' is NOT ENABLED IN MANIFEST"
+                if ($options.apply) { throw "$surfaceWarning; migrate --apply will not add a Surface automatically" }
+                Write-Host "[migrate] WARN $surfaceWarning; dry-run only" -ForegroundColor Yellow
+            }
+        }
     }
     foreach ($toolEntry in $toolEntries) {
         $compatibilityError = Get-DefaultCompatibilityError -Entry $toolEntry -SelectedSurfaces $selectedSurfaceValues
@@ -746,7 +785,8 @@ function Invoke-Migrate($Manifest) {
         $state = if ($packProperty) { [string](Get-KntJsonProperty $packProperty.Value "state") } else { "DEFAULT" }
         if ($state -eq "DEFAULT") {
             $kind = if ([string]$entry.kind -eq "surface") { "Surface" } else { "Tool" }
-            Copy-DefaultImplementation -DefaultId ([string]$entry.id) -ProjectRoot $projectRoot -Kind $kind -ConflictingDefaults $conflictingDefaults
+            $plan = Get-DefaultImplementationPlan -DefaultId ([string]$entry.id) -ProjectRoot $projectRoot -Kind $kind
+            Apply-DefaultImplementationPlan -Plan $plan -ConflictingDefaults $conflictingDefaults
         }
     }
     foreach ($conflictingDefault in @($conflictingDefaults | Select-Object -Unique)) {
@@ -1075,7 +1115,16 @@ function Invoke-Doctor($Manifest) {
             if ($state -ne "DEFAULT") { continue }
             try {
                 $entry = Find-AnyDefaultCatalogEntry -Catalog $catalog -Identifier ([string]$packProperty.Name)
-                $compatibilityError = Get-DefaultCompatibilityError -Entry $entry -SelectedSurfaces $manifestSurfaces
+                $compatibilityError = if ([string]$entry.kind -eq "surface") {
+                    $requiredSurfaces = @($entry.compatible_surfaces)
+                    if ($requiredSurfaces.Count -gt 0 -and @($requiredSurfaces | Where-Object { $_ -in $manifestSurfaces }).Count -eq 0) {
+                        "Surface Default '$($entry.id)' is not enabled in Manifest"
+                    }
+                    else { $null }
+                }
+                else {
+                    Get-DefaultCompatibilityError -Entry $entry -SelectedSurfaces $manifestSurfaces
+                }
                 if ($compatibilityError) {
                     Write-Host "[doctor] $compatibilityError" -ForegroundColor Red
                     $ok = $false

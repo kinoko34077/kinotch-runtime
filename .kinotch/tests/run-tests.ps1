@@ -129,6 +129,7 @@ function Invoke-KntInitFixture {
         [string[]]$Defaults,
         [int]$ExpectedExit = 0,
         [switch]$RemoveExistingCi,
+        [scriptblock]$Prepare,
         [scriptblock]$AssertOutput
     )
     $tempRoot = Join-Path ([IO.Path]::GetTempPath()) ("kinotch-init-test-" + [guid]::NewGuid().ToString("N"))
@@ -142,6 +143,7 @@ function Invoke-KntInitFixture {
             Remove-Item -LiteralPath (Join-Path $tempRoot ".github/workflows/verify.yml") -Force -ErrorAction SilentlyContinue
             Remove-Item -LiteralPath (Join-Path $tempRoot ".github/workflows/kinotch-default.yml") -Force -ErrorAction SilentlyContinue
         }
+        if ($Prepare) { & $Prepare $tempRoot }
         $router = Join-Path $tempRoot ".kinotch/scripts/knt.ps1"
         $invokeArgs = @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $router, "-RootOverride", $tempRoot, "init")
         foreach ($profile in $Profiles) { $invokeArgs += @("--profile", $profile) }
@@ -308,6 +310,21 @@ Invoke-TestCase "Protected paths and Base index use canonical separators" {
     $indexedPaths = @($index.files | ForEach-Object { [string]$_.path })
     Assert-True (@($indexedPaths | Where-Object { $_ -match "^[\\/]" }).Count -eq 0) "index path has a leading separator"
     Assert-True (@($indexedPaths | Where-Object { $_ -match "\\" }).Count -eq 0) "index path contains a Windows separator"
+}
+
+Invoke-TestCase "Project path containment is OS-aware and rejects sibling escapes" {
+    $helperPath = Join-Path $RepoRoot ".kinotch/scripts/path-containment.ps1"
+    Assert-True (Test-Path -LiteralPath $helperPath -PathType Leaf) "path containment helper is missing"
+    . $helperPath
+    Assert-True (Test-KntProjectPathContained -Root "C:\repo" -Candidate "C:\repo\file.txt" -Windows $true) "Windows child path was rejected"
+    Assert-True (-not (Test-KntProjectPathContained -Root "C:\repo" -Candidate "C:\repo-other\file.txt" -Windows $true)) "Windows sibling prefix was accepted"
+    Assert-True (-not (Test-KntProjectPathContained -Root "C:\repo" -Candidate "C:\repo\..\outside.txt" -Windows $true)) "Windows parent escape was accepted"
+    Assert-True (Test-KntProjectPathContained -Root "/tmp/Repo" -Candidate "/tmp/Repo/file.txt" -Windows $false) "Unix child path was rejected"
+    Assert-True (-not (Test-KntProjectPathContained -Root "/tmp/Repo" -Candidate "/tmp/repo/file.txt" -Windows $false)) "Unix case-variant sibling was accepted"
+    Assert-True (-not (Test-KntProjectPathContained -Root "/tmp/Repo" -Candidate "/tmp/Repo-other/file.txt" -Windows $false)) "Unix sibling prefix was accepted"
+    Assert-True (-not (Test-KntProjectPathContained -Root "/tmp/Repo" -Candidate "/tmp/Repo/../outside.txt" -Windows $false)) "Unix parent escape was accepted"
+    Assert-True (-not (Test-KntProjectPathContained -Root "/tmp/Repo" -Candidate "/tmp/Repo" -Windows $false)) "Project root was implicitly accepted"
+    Assert-True (Test-KntProjectPathContained -Root "/tmp/Repo" -Candidate "/tmp/Repo" -Windows $false -AllowRoot) "Explicit root allowance was rejected"
 }
 
 Invoke-TestCase "valid minimal project passes doctor" {
@@ -504,6 +521,86 @@ Invoke-TestCase "init materializes safe Default implementations" {
         Assert-Equal 1 $LASTEXITCODE "generated-integrity source-stale exit code"
     }
 }
+Invoke-TestCase "Default materialization is atomic when an init template conflicts" {
+    Invoke-KntInitFixture -Profiles @("web-app") -Defaults @("pwa") -Prepare {
+        param($root)
+        $conflict = Join-Path $root ".kinotch/templates/project/public/service-worker.js"
+        New-Item -ItemType Directory -Path (Split-Path -Parent $conflict) -Force | Out-Null
+        Set-Content -LiteralPath $conflict -Value "project-owned-service-worker" -NoNewline
+    } -AssertOutput {
+        param($root, $output)
+        $defaults = Get-Content -Raw -Encoding UTF8 (Join-Path $root "project/defaults.json") | ConvertFrom-Json
+        Assert-Equal "OVERRIDE" $defaults.packs.pwa.state "init conflict state"
+        Assert-Equal "project-owned-service-worker" (Get-Content -Raw -Encoding UTF8 (Join-Path $root "project/public/service-worker.js")) "init conflict file"
+        foreach ($relative in @(
+            "project/public/manifest.webmanifest",
+            "project/src/pwa/register.js",
+            "project/tools/pwa-check.ps1"
+        )) {
+            Assert-True (-not (Test-Path -LiteralPath (Join-Path $root $relative) -PathType Leaf)) "init partially materialized $relative"
+        }
+        Assert-True ($output -match "no Default files were materialized|OVERRIDE") "init conflict output was not reported"
+    }
+}
+Invoke-TestCase "Default materialization is atomic for first middle and last conflicts" {
+    foreach ($conflictRelative in @(
+        "project/public/manifest.webmanifest",
+        "project/public/service-worker.js",
+        "project/tools/pwa-check.ps1"
+    )) {
+        Invoke-KntFixture -Name "valid-minimal" -Command "migrate" -Arguments @("--apply", "--default", "pwa") -ExpectedExit 0 -Prepare {
+            param($root)
+            $manifestPath = Join-Path $root "project/project.json"
+            $manifest = Get-Content -Raw -Encoding UTF8 $manifestPath | ConvertFrom-Json
+            $manifest.surfaces.web = $true
+            [IO.File]::WriteAllText($manifestPath, (ConvertTo-Json $manifest -Depth 20) + [Environment]::NewLine, (New-Object System.Text.UTF8Encoding($false)))
+            $conflictPath = Join-Path $root $conflictRelative
+            New-Item -ItemType Directory -Path (Split-Path -Parent $conflictPath) -Force | Out-Null
+            Set-Content -LiteralPath $conflictPath -Value ("project-owned-" + $conflictRelative) -NoNewline
+        } -AssertOutput {
+            param($root, $output)
+            $defaults = Get-Content -Raw -Encoding UTF8 (Join-Path $root "project/defaults.json") | ConvertFrom-Json
+            Assert-Equal "OVERRIDE" $defaults.packs.pwa.state "migrate conflict state"
+            $conflictPath = Join-Path $root $conflictRelative
+            Assert-Equal ("project-owned-" + $conflictRelative) (Get-Content -Raw -Encoding UTF8 $conflictPath) "migrate conflict file"
+            foreach ($relative in @(
+                "project/public/manifest.webmanifest",
+                "project/public/service-worker.js",
+                "project/src/pwa/register.js",
+                "project/tools/pwa-check.ps1"
+            )) {
+                if ($relative -ne $conflictRelative) {
+                    Assert-True (-not (Test-Path -LiteralPath (Join-Path $root $relative) -PathType Leaf)) "migrate partially materialized $relative for $conflictRelative"
+                }
+            }
+            Assert-True ($output -match "no Default files were materialized|OVERRIDE") "migrate conflict output was not reported"
+        }
+    }
+}
+Invoke-TestCase "identical Default files are preserved while missing siblings materialize" {
+    Invoke-KntFixture -Name "valid-minimal" -Command "migrate" -Arguments @("--apply", "--default", "pwa") -ExpectedExit 0 -Prepare {
+        param($root)
+        $manifestPath = Join-Path $root "project/project.json"
+        $manifest = Get-Content -Raw -Encoding UTF8 $manifestPath | ConvertFrom-Json
+        $manifest.surfaces.web = $true
+        [IO.File]::WriteAllText($manifestPath, (ConvertTo-Json $manifest -Depth 20) + [Environment]::NewLine, (New-Object System.Text.UTF8Encoding($false)))
+        $template = Join-Path $root ".kinotch/templates/defaults/pwa/public/service-worker.js"
+        $existing = Join-Path $root "project/public/service-worker.js"
+        New-Item -ItemType Directory -Path (Split-Path -Parent $existing) -Force | Out-Null
+        Copy-Item -LiteralPath $template -Destination $existing
+    } -AssertOutput {
+        param($root, $output)
+        $defaults = Get-Content -Raw -Encoding UTF8 (Join-Path $root "project/defaults.json") | ConvertFrom-Json
+        Assert-Equal "DEFAULT" $defaults.packs.pwa.state "identical Default state"
+        foreach ($relative in @(
+            "project/public/manifest.webmanifest",
+            "project/src/pwa/register.js",
+            "project/tools/pwa-check.ps1"
+        )) {
+            Assert-True (Test-Path -LiteralPath (Join-Path $root $relative) -PathType Leaf) "missing sibling was not materialized: $relative"
+        }
+    }
+}
 Invoke-TestCase "file and generated-integrity Defaults reject paths outside Project root" {
     Invoke-KntInitFixture -Profiles @("web-app") -Defaults @("file-io", "generated-integrity") -AssertOutput {
         param($root, $output)
@@ -544,6 +641,20 @@ Invoke-TestCase "migrate dry-run reports candidates without writing" {
         Assert-True ($output -match "Candidate Default Pack.*cli") "migrate candidate was not reported"
         Assert-True ($output -match "no files changed|--apply") "migrate dry-run warning was not reported"
         Assert-True (-not (Test-Path (Join-Path $root "project/defaults.json"))) "migrate dry-run wrote a file"
+    }
+}
+Invoke-TestCase "migrate dry-run warns when an explicit Surface is not enabled" {
+    Invoke-KntFixture -Name "valid-minimal" -Command "migrate" -Arguments @("--profile", "cli") -ExpectedExit 0 -AssertOutput {
+        param($root, $output)
+        Assert-True ($output -match "NOT ENABLED IN MANIFEST") "migrate dry-run did not warn about a disabled Surface"
+        Assert-True (-not (Test-Path (Join-Path $root "project/defaults.json"))) "Surface dry-run wrote a Default state"
+    }
+}
+Invoke-TestCase "migrate apply rejects an explicit Surface not enabled in Manifest" {
+    Invoke-KntFixture -Name "valid-minimal" -Command "migrate" -Arguments @("--apply", "--profile", "cli") -ExpectedExit 2 -AssertOutput {
+        param($root, $output)
+        Assert-True ($output -match "NOT ENABLED IN MANIFEST|requires.*enabled|not enabled") "migrate apply accepted a disabled Surface"
+        Assert-True (-not (Test-Path (Join-Path $root "project/defaults.json"))) "disabled Surface apply wrote a Default state"
     }
 }
 Invoke-TestCase "migrate rejects removed Tool Default aliases" {
@@ -624,6 +735,8 @@ Invoke-TestCase "migrate apply preserves Project override and adds missing pack"
         param($root)
         $manifestPath = Join-Path $root "project/project.json"
         $manifest = Get-Content -Raw -Encoding UTF8 $manifestPath | ConvertFrom-Json
+        $manifest.surfaces.cli = $true
+        $manifest.surfaces.mcp = $true
         $manifest.paths | Add-Member -NotePropertyName defaults -NotePropertyValue "defaults.json" -Force
         [IO.File]::WriteAllText($manifestPath, (ConvertTo-Json $manifest -Depth 20) + [Environment]::NewLine, (New-Object System.Text.UTF8Encoding($false)))
         $defaults = [pscustomobject]@{
@@ -705,6 +818,23 @@ Invoke-TestCase "doctor rejects a hand-edited incompatible DEFAULT Tool" {
     } -AssertOutput {
         param($root, $output)
         Assert-True ($output -match "not compatible|incompatible.*Surface") "doctor accepted an incompatible DEFAULT Tool"
+    }
+}
+Invoke-TestCase "doctor rejects a hand-edited DEFAULT Surface disabled in Manifest" {
+    Invoke-KntFixture -Name "valid-minimal" -Command "doctor" -ExpectedExit 1 -Prepare {
+        param($root)
+        $manifestPath = Join-Path $root "project/project.json"
+        $manifest = Get-Content -Raw -Encoding UTF8 $manifestPath | ConvertFrom-Json
+        $manifest.paths | Add-Member -NotePropertyName defaults -NotePropertyValue "defaults.json" -Force
+        [IO.File]::WriteAllText($manifestPath, (ConvertTo-Json $manifest -Depth 20) + [Environment]::NewLine, (New-Object System.Text.UTF8Encoding($false)))
+        $defaults = [pscustomobject]@{
+            schema_version = 1
+            packs = [pscustomobject]@{ cli = [pscustomobject]@{ state = "DEFAULT" } }
+        }
+        [IO.File]::WriteAllText((Join-Path $root "project/defaults.json"), (ConvertTo-Json $defaults -Depth 10) + [Environment]::NewLine, (New-Object System.Text.UTF8Encoding($false)))
+    } -AssertOutput {
+        param($root, $output)
+        Assert-True ($output -match "Surface.*cli.*not enabled|cli.*not enabled|incompatible.*Surface") "doctor accepted a disabled DEFAULT Surface"
     }
 }
 Invoke-TestCase "external BaseOverride rejects init and migrate writes" {
@@ -956,7 +1086,7 @@ Invoke-TestCase "Base documentation and profile status are finalized" {
     Assert-True ($runtime -match "ActionRequest") "Runtime candidate-contract content is missing"
     Assert-True ($workflow -match "knt\.ps1 setup") "Base CI setup step is missing"
     Assert-Equal 0 @($surfaceRegistry.surfaces.PSObject.Properties).Count "Base Surface Registry should be empty"
-    Assert-Equal "0.3.8" $baseVersion "Base version"
+    Assert-Equal "0.3.9" $baseVersion "Base version"
     Assert-True (@($catalog.defaults | Where-Object { $_.kind -eq "surface" }).Count -ge 8) "Surface Default catalog entries are incomplete"
     Assert-Equal 4 @($catalog.defaults | Where-Object { $_.kind -eq "tool" }).Count "Active Tool Default catalog count"
     foreach ($profileFile in Get-ChildItem (Join-Path $RepoRoot ".kinotch/profiles") -File) {

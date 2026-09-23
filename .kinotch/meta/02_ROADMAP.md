@@ -1,9 +1,12 @@
 # 02 — Roadmap
 
-Current position: Phase 3B safe Default behavior and Phase 4A read-only Canary
-validation are complete. Phase 4B adoption-safety hardening is complete; Phase
-4C has eight clean Canary adoptions, while additional repositories remain
-explicitly staged until their own verification gates are green.
+Current position: Phase 5 — gradual repository adoption / maintenance.
+Phase 3B safe Default behavior, Phase 4A read-only Canary validation, Phase 4B
+adoption-safety hardening, and the Phase 4C adoption decision review are
+complete. Eight repositories are recorded as cleanly adopted at Base v0.3.8;
+Base v0.3.9 is the current maintenance release. Additional
+repositories are explicitly staged, not adopted, or unavailable according to
+the operation-state table in `project/docs/DEFAULT_ROLLOUT_DRY_RUN.md`.
 Phase 2A Portable Contract validation remains independent and provisional;
 Default adoption does not wait for Portable Contract maturity.
 
@@ -178,17 +181,19 @@ Surface / Tool互換性、doctor再検証、repository-local `.kinotch/` 書込�
 structured command引数、Project-root path containment、Default Catalog
 semantic validation、既存ファイル衝突時のOVERRIDE記録、Project commandの
 native exit code伝播と互換Shape候補フィルタを実装する。Base v0.3.8
-としてこの安全点を固定する。
+としてこの安全点を固定した。v0.3.9ではDefault materializationのatomic
+preflight、OS-aware path containment、Surface/Manifest consistencyを保守修正する。
 
-## Phase 4C — init / migrate and existing repository adoption
+## Phase 4C — init / migrate and existing repository adoption (complete)
 
 既存repoは一括変更せず、`jev-audit`、`kinotch-api`、
 `lyric_reader_page`、`weather-widget`、`memory-game`、
 `Structured-Cell-Automaton`、`2bit-cell-automaton`、`colony-ai` の初回適用を完了した。
 `refil-viewer` はBase適用準備まで完了したが、既存Vite build失敗のため
-clean Canaryには数えない。
-残りのrepoは明示判断
-とRepository Manifestが揃ったrepoだけへ段階適用する。
+clean Canaryには数えない。`standby-display`、`SynTrail-LM`、
+`dev_agent`、`IDS-Composit`、`srt2subtitle`を含む残りのrepoは、既存実装、
+root hygiene、dirty worktree、またはcheckout可否を個別に確認し、導入しない
+判断も含めてrollout tableへ記録した。残りのrepoへ一括適用しない。
 
 - `knt init --profile <surface> --default <tool-default>`
 - 複数Surface / Tool Default選択による初期化
@@ -206,8 +211,13 @@ fileは自動書換えしない。Manifestなしのshape probeでは、既存相
 `OVERRIDE`候補として表示し、既存repoへBase構造を自動投入しない。外部Base
 overrideはshape probe専用で、既存repoのapplyには使用しない。
 
-## Phase 5 — 既存repoへの段階導入
+完了条件は全repoへのBase導入ではなく、代表repoごとの採用可否、Project
+failureとBase failureの分離、全repoの運用状態記録、およびBase v0.3.9の
+検証済み状態である。
 
+## Phase 5 — 既存repoへの段階導入 / maintenance (current)
+
+専用adoption campaignを継続せず、通常のProject作業に同期判断を組み込む。
 全repoを一括書換えしない。
 
 - 改修するrepoから順次適用
@@ -218,6 +228,10 @@ overrideはshape probe専用で、既存repoのapplyには使用しない。
   を分類する
 - CanaryはWeb / Verify、Generated Integrity、CLI / MCP、File I/O / Windows、
   APIの各系統から段階的に確認する
+- 既存repoを改修したときだけ、必要ならBase同期後に`doctor`、
+  `base-check`、既存`verify`を実行する
+- Phase 5で追うのは、Base導入repo数、Base version分布、doctor failure、
+  Base起因verify failure、および反復する`OVERRIDE`だけとする
 
 ## Phase 6 — 安定化
 

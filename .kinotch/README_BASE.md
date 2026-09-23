@@ -1,6 +1,6 @@
 # KiNoTch. Repository Base — Common README
 
-Base version: `0.3.8`
+Base version: `0.3.9`
 
 この文書はKiNoTch.標準リポジトリの共通取扱説明書である。個別READMEへ同じ説明を複製しない。
 
@@ -57,6 +57,7 @@ PowerShell:
 - Manifest pathsとcommand cwdが存在するか
 - Default CatalogがSchemaとsemantic規則に適合し、Default stateが `DEFAULT` / `OVERRIDE` / `DISABLED` のいずれかであるか
 - `DEFAULT` ToolがManifestの有効Surfaceと互換するか
+- `DEFAULT` SurfaceがManifestで有効化されているか
 - Manifestなしの `migrate` ではpackage / Cargo / Python / workflow / web asset形状から候補をdry-run診断する
 - 定義済み共通コマンド
 
@@ -68,7 +69,7 @@ PowerShell:
 
 `knt init --profile <surface>` は `minimal`、`web-app`、`cli`、`windows-gui`（`windows` alias）、`mcp`、`api`、`agent`、`library` を複数選択し、TemplateからProject Overlayを生成する。`--default <tool-default>` で `ci-test`、`generated-integrity`、`file-io`、`pwa` の実装済みTool Defaultを選択できる。`knt verify` 自体はL1 Hard Baseの常設コマンドであり、Tool Default stateで無効化・生成する対象ではない。`cli` はJSON/error/exit/help helper、`windows` はExplorer/clipboard境界、`mcp` はtool naming/input/diagnostic境界、`api` はHTTP statusやcode体系を固定しないerror envelope schemaを生成する。`ci-test` はBase自身のworkflowとは別の非Deploy workflowを生成し、doctor → setup → verifyを実行する。`pwa` は相対base pathで動くmanifest / service worker / registration helper / check、`generated-integrity` はProject root内のsourceとartifact双方のSHA-256 metadata / stale check / update helper、`file-io` はUTF-8 text専用helperと形式非依存のProject callback境界を生成する。選択ProfileはSurface宣言と安全な補助だけを生成し、`runtime.modules` は空のまま保持する。既存の `project/project.json` または既存Projectファイルは上書きしない。
 
-`knt migrate` は既存ProjectのSurface / Tool Default候補を表示するだけで、既定ではファイルを変更しない。Project Manifestがない場合も、`-BaseOverride` を指定したBase routerからrepository shapeをread-only検出できる。`-BaseOverride` はshape probe専用であり、`init`、`migrate --apply`、Default materialization、Base mutationには使用できない。書込みには対象Repository自身の有効な `.kinotch/` とProject Manifestが必要である。`--apply` を明示した場合だけ `project/defaults.json` と必要なManifest pathを更新し、DEFAULT状態の安全な補助ファイルを不足分だけ生成する。既存の `OVERRIDE` / `DISABLED` 状態は保持し、同じ内容の既存ファイルはDEFAULTのまま、異なる内容の既存ファイルはOVERRIDEとして記録する。Domain fileは変更しない。
+`knt migrate` は既存ProjectのSurface / Tool Default候補を表示するだけで、既定ではファイルを変更しない。Project Manifestがない場合も、`-BaseOverride` を指定したBase routerからrepository shapeをread-only検出できる。`-BaseOverride` はshape probe専用であり、`init`、`migrate --apply`、Default materialization、Base mutationには使用できない。書込みには対象Repository自身の有効な `.kinotch/` とProject Manifestが必要である。Manifestで無効なSurfaceを `migrate --apply --profile` で自動有効化することはない。`--apply` を明示した場合だけ `project/defaults.json` と必要なManifest pathを更新し、DEFAULT状態の安全な補助ファイルを不足分だけ生成する。Default実装は全ファイルを事前検査し、1件でも衝突があればそのDefaultから何も生成せず `OVERRIDE` として記録する。既存の `OVERRIDE` / `DISABLED` 状態は保持し、同じ内容の既存ファイルはDEFAULTのまま、異なる内容の既存ファイルはOVERRIDEとして記録する。Domain fileは変更しない。
 
 ## Validatorの対応範囲
 

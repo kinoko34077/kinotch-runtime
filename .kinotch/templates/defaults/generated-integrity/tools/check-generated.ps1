@@ -3,6 +3,8 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+$repositoryRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot "../.."))
+. (Join-Path $repositoryRoot ".kinotch/scripts/path-containment.ps1")
 $configPath = Join-Path $Root "generated-integrity.json"
 if (-not (Test-Path -LiteralPath $configPath -PathType Leaf)) {
     Write-Error "generated-integrity.json is missing"
@@ -17,7 +19,6 @@ if ([int]$config.schema_version -ne 1 -or [string]$config.algorithm -ne "SHA-256
 $failed = $false
 foreach ($entry in @($config.entries)) {
     $rootPath = [IO.Path]::GetFullPath($Root).TrimEnd([char[]]@("/", "\"))
-    $rootPrefix = $rootPath + [IO.Path]::DirectorySeparatorChar
     $sourceRelative = [string]$entry.source
     $artifactRelative = [string]$entry.artifact
     if ([IO.Path]::IsPathRooted($sourceRelative) -or [IO.Path]::IsPathRooted($artifactRelative)) {
@@ -27,12 +28,12 @@ foreach ($entry in @($config.entries)) {
     }
     $source = [IO.Path]::GetFullPath((Join-Path $rootPath $sourceRelative))
     $artifact = [IO.Path]::GetFullPath((Join-Path $rootPath $artifactRelative))
-    if (-not $source.StartsWith($rootPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+    if (-not (Test-KntProjectPathContained -Root $rootPath -Candidate $source)) {
         Write-Error "Generated source path is outside the Project root: $sourceRelative"
         $failed = $true
         continue
     }
-    if (-not $artifact.StartsWith($rootPrefix, [System.StringComparison]::OrdinalIgnoreCase)) {
+    if (-not (Test-KntProjectPathContained -Root $rootPath -Candidate $artifact)) {
         Write-Error "Generated artifact path is outside the Project root: $artifactRelative"
         $failed = $true
         continue

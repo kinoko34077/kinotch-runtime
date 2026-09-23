@@ -46,7 +46,7 @@
 ## Phase 3A — KiNoTch. Default Catalog
 
 - Surface: `minimal`, `web-app`, `cli`, `windows`, `mcp`, `api`, `agent`, `library`
-- Tool: `verify-binding` (CLI alias `verify`), `ci-test`, `generated-integrity`, `file-io`, `pwa`, `pages`, `secrets`, `local-app`
+- Tool: `ci-test`, `generated-integrity`, `file-io`, `pwa`
 - `knt init`はProfile選択からRuntime moduleを自動注入しない。
 - 既存Framework・Project実装はOverrideとして保持できる。
 
@@ -63,7 +63,7 @@
 - `api` permissive error-envelope schema without HTTP policy
 - No Domain format, deploy policy, or Runtime module is generated.
 
-## Phase 4 — init / migrate and existing repository adoption (next)
+## Phase 4 — init / migrate and existing repository adoption (complete)
 
 - `knt init --profile <surface> --default <tool-default>`
 - `knt migrate` dry-run / explicit `--apply`
@@ -71,6 +71,8 @@
 - Manifest-less repository-shape probe via a Base source override
 - generated artifact / stale check
 - 詳細doctor / conformance report
+- v0.3.9 maintenance hardening: atomic Default materialization, OS-aware
+  Project-root containment, and Surface/Manifest consistency
 
 ## Phase 5 — 既存repoへ段階導入
 
