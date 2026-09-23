@@ -170,6 +170,7 @@ function Invoke-KntShapeMigrateFixture {
     param(
         [scriptblock]$AssertOutput,
         [string]$WorkflowText = "name: Verify`nrun: npm test",
+        [string]$PackageJson = '{"scripts":{"test":"node --test","build":"vite build"},"devDependencies":{"vite":"latest"}}',
         [switch]$GeneratedFile,
         [switch]$IntegrityEvidence
     )
@@ -181,7 +182,7 @@ function Invoke-KntShapeMigrateFixture {
         } | Copy-Item -Destination $tempRoot -Recurse -Force
         New-Item -ItemType Directory -Path (Join-Path $tempRoot ".github/workflows") -Force | Out-Null
         New-Item -ItemType Directory -Path (Join-Path $tempRoot "public") -Force | Out-Null
-        Set-Content -LiteralPath (Join-Path $tempRoot "package.json") -Value '{"scripts":{"test":"node --test","build":"vite build"},"devDependencies":{"vite":"latest"}}' -NoNewline
+        Set-Content -LiteralPath (Join-Path $tempRoot "package.json") -Value $PackageJson -NoNewline
         Set-Content -LiteralPath (Join-Path $tempRoot ".github/workflows/verify.yml") -Value $WorkflowText -NoNewline
         Set-Content -LiteralPath (Join-Path $tempRoot "public/manifest.json") -Value '{"name":"Shape","start_url":"/"}' -NoNewline
         Set-Content -LiteralPath (Join-Path $tempRoot "service-worker.js") -Value "self.addEventListener('fetch', () => {});" -NoNewline
@@ -573,6 +574,19 @@ Invoke-TestCase "shape probe distinguishes generated files from integrity checks
         Assert-True ($output -match "Candidate Default Pack 'generated-integrity': state OVERRIDE") "integrity evidence was not marked OVERRIDE"
     }
 }
+Invoke-TestCase "shape probe does not treat Wrangler-only Web as API" {
+    Invoke-KntShapeMigrateFixture -PackageJson '{"scripts":{"test":"node --test","build":"npm run build"},"devDependencies":{"wrangler":"latest"}}' -AssertOutput {
+        param($root, $output)
+        Assert-True ($output -match "Detected Surface candidates:.*web-app") "Wrangler-only Web surface was not detected"
+        Assert-True ($output -notmatch "Detected Surface candidates:.*api") "Wrangler-only Web project was misclassified as API"
+    }
+}
+Invoke-TestCase "shape probe still detects Hono API" {
+    Invoke-KntShapeMigrateFixture -PackageJson '{"dependencies":{"hono":"latest"}}' -AssertOutput {
+        param($root, $output)
+        Assert-True ($output -match "Detected Surface candidates:.*api") "Hono API surface was not detected"
+    }
+}
 Invoke-TestCase "migrate apply preserves Project override and adds missing pack" {
     Invoke-KntFixture -Name "valid-minimal" -Command "migrate" -Arguments @("--apply", "--profile", "cli", "--profile", "mcp") -ExpectedExit 0 -Prepare {
         param($root)
@@ -885,6 +899,7 @@ Invoke-TestCase "Base documentation and profile status are finalized" {
     $spec = Get-Content -Raw (Join-Path $RepoRoot "project/docs/SPEC.md")
     $state = Get-Content -Raw (Join-Path $RepoRoot "project/docs/CURRENT_STATE.md")
     $runtime = Get-Content -Raw (Join-Path $RepoRoot ".kinotch/RUNTIME_INTEGRATION.md")
+    $workflow = Get-Content -Raw (Join-Path $RepoRoot ".github/workflows/verify.yml")
     $surfaceRegistry = Get-Content -Raw (Join-Path $RepoRoot "project/contracts/surfaces.json") | ConvertFrom-Json
     $catalog = Get-Content -Raw (Join-Path $RepoRoot ".kinotch/defaults/catalog.json") | ConvertFrom-Json
     $baseVersion = (Get-Content -Raw (Join-Path $RepoRoot ".kinotch/BASE_VERSION")).Trim()
@@ -894,8 +909,9 @@ Invoke-TestCase "Base documentation and profile status are finalized" {
     Assert-True ($state -match "Error / Result / Progress / Resource / Artifact schema definitions") "CURRENT_STATE schema-definition wording is missing"
     Assert-True ($runtime -match "Action Result") "Runtime defined-contract content is missing"
     Assert-True ($runtime -match "ActionRequest") "Runtime candidate-contract content is missing"
+    Assert-True ($workflow -match "knt\.ps1 setup") "Base CI setup step is missing"
     Assert-Equal 0 @($surfaceRegistry.surfaces.PSObject.Properties).Count "Base Surface Registry should be empty"
-    Assert-Equal "0.3.0" $baseVersion "Base version"
+    Assert-Equal "0.3.1" $baseVersion "Base version"
     Assert-True (@($catalog.defaults | Where-Object { $_.kind -eq "surface" }).Count -ge 8) "Surface Default catalog entries are incomplete"
     Assert-Equal 4 @($catalog.defaults | Where-Object { $_.kind -eq "tool" }).Count "Active Tool Default catalog count"
     foreach ($profileFile in Get-ChildItem (Join-Path $RepoRoot ".kinotch/profiles") -File) {

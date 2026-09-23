@@ -318,7 +318,9 @@ function Get-RepositoryShape($Catalog) {
     $scriptsText = if ($package -and $package.scripts) { ($package.scripts | Out-String) } else { "" }
     $dependencyText = ($packageText + " " + $pythonText + " " + $cargoText).ToLowerInvariant()
 
-    if ($dependencyText -match "hono|cloudflare|wrangler|service binding|worker") {
+    # Wrangler is also the normal Pages/static-Web toolchain. Treat it as an
+    # API marker only when an application/API boundary is explicit.
+    if ($dependencyText -match "(?i)\bhono\b|service\s+binding|cloudflare\s+worker") {
         Add-RepositoryShapeSurface -SurfaceIds $surfaceIds -SurfaceStates $surfaceStates -SurfaceId "api"
     }
     if ($hasWebAssets -or $dependencyText -match "vite|react|vue|svelte|astro|next") {

@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "base_version": "0.3.0",
+  "base_version": "0.3.1",
   "files": [
     {
       "path": ".editorconfig",
@@ -12,7 +12,7 @@
     },
     {
       "path": ".github/workflows/verify.yml",
-      "sha256": "c795ffbd5e95f2635b886fc8a858957836555e409e77ac3673d49ffff206ae5a"
+      "sha256": "ae4ac2882296e238f141db1d46247dd77027411d7ac954622e96ddf85de27f3a"
     },
     {
       "path": ".gitignore",
@@ -24,7 +24,7 @@
     },
     {
       "path": ".kinotch/BASE_VERSION",
-      "sha256": "d915cc95d6ca8f47ae297713ed46d4e5c5d99ddd29fc3c61e263bdf305f2b5b0"
+      "sha256": "79e3f22ca37c7fdf4c29ae3648d6b008c3cb6547260a453409275470919dc674"
     },
     {
       "path": ".kinotch/DEVELOPMENT_FLOW.md",
@@ -40,7 +40,7 @@
     },
     {
       "path": ".kinotch/README_BASE.md",
-      "sha256": "415077bad91303e2a82275cc892522a4214cb217909c7cbfeeb665fbbe4165d2"
+      "sha256": "adee561990b893b9f1747791e0c354bcf8cb8fc559b1b6e6c0000f7ade5dccac"
     },
     {
       "path": ".kinotch/REPOSITORY_STANDARD.md",
@@ -68,7 +68,7 @@
     },
     {
       "path": ".kinotch/meta/02_ROADMAP.md",
-      "sha256": "f9206b2bce66675f6410fd8150ec06846d2a682fdbee51d60c25f616c473ffde"
+      "sha256": "0fc0da5ae1557d298f3edb3db9647537a06134ba2b21cb95efe73475cc7542cf"
     },
     {
       "path": ".kinotch/meta/03_GUARDRAILS.md",
@@ -168,7 +168,7 @@
     },
     {
       "path": ".kinotch/scripts/knt.ps1",
-      "sha256": "efbee1c2669fdfe510b1b29fc000e3f8a0c98d60e190b271930a2a483d3259cf"
+      "sha256": "b79ef3f018e0784e7759079defbbbed0be989f24dcd2845b1b7f3afc99b7cdb8"
     },
     {
       "path": ".kinotch/scripts/update-base-index.ps1",
@@ -380,7 +380,7 @@
     },
     {
       "path": ".kinotch/tests/run-tests.ps1",
-      "sha256": "2d35cd54f4272f8c7d0c99e2d36babe5f0aa5d7e702741ade4919482eaa7f6da"
+      "sha256": "d4a0cbb6ee9d21cf4e5789a48742dccc641f0718285dc527ebf683ad8f2d1a9f"
     },
     {
       "path": "AGENTS.md",
