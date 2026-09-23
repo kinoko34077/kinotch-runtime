@@ -18,6 +18,7 @@
 4. [03_GUARDRAILS.md](03_GUARDRAILS.md) — 今回特に守る境界・非目標
 5. [04_EXTRACTION_CRITERIA.md](04_EXTRACTION_CRITERIA.md) — Base / Runtimeへ抽象抽出する基準
 6. [05_VALIDATION_PLAN.md](05_VALIDATION_PLAN.md) — 実repoでの検証方法
+7. [06_DEFAULT_FIRST_STANDARD.md](06_DEFAULT_FIRST_STANDARD.md) — Default-first標準化方針
 
 ## 位置づけ
 

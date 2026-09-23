@@ -43,3 +43,5 @@ CURRENT_STATE更新
 ## 共通化候補
 
 個別repo内で解決した後、複数repoへ同じ知識として再利用されることが確認できた場合のみBase / Runtimeへ昇格する。
+
+ただし、Domain意味を持たず安全に外せる共通便利機能は、Default-first方針に従いProject単位の `DEFAULT` / `OVERRIDE` / `DISABLED` として先に提供できる。Portable Contractの成熟度をDefault導入の前提にしない。

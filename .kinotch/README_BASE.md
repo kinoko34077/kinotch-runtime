@@ -1,5 +1,7 @@
 # KiNoTch. Repository Base — Common README
 
+Base version: `0.3.0`
+
 この文書はKiNoTch.標準リポジトリの共通取扱説明書である。個別READMEへ同じ説明を複製しない。
 
 ## 基本境界
@@ -13,6 +15,12 @@ KiNoTch.Runtime = 複数repoで再利用する共通実装。個別repoへコピ
 
 Base-wide Metaは `.kinotch/meta/` に置き、新規Repository用の生成元は `.kinotch/templates/project/` に置く。Base自身のProject情報は `project/**` に記録し、Templateと混同しない。
 
+## Default-first
+
+共通要素はHard Base、Surface / Tool Default、Portable Semantic Contract、Project Overlay / Domainの4層へ分類する。低リスクで安全に外せる標準便利機能はDefaultとして先に提供し、Domain意味・公開互換性・永続形式・権限境界を持つものだけRuntimeのPortable Contract候補として検証する。正本と判断規則は [Default-first標準化方針](meta/06_DEFAULT_FIRST_STANDARD.md) に置く。
+
+ProjectのDefault状態は `DEFAULT`、`OVERRIDE`、`DISABLED` のいずれかで表現する。Defaultの一覧と互換Surfaceは [Default Catalog](defaults/catalog.json) を正本とする。`knt init --profile <surface> --default <tool-default>` はCatalogから選択したPackの共通実装を生成するが、既存の `project/project.json` を上書きしない。Surface選択はRuntime moduleを自動追加しない。
+
 ## 共通コマンド
 
 Windows cmd:
@@ -24,6 +32,9 @@ knt.cmd dev
 knt.cmd test
 knt.cmd build
 knt.cmd verify
+knt.cmd init --profile web-app --default pwa
+knt.cmd init --profile cli --profile mcp --default ci-test
+knt.cmd migrate --profile web-app --default pwa
 knt.cmd smoke
 ```
 
@@ -44,12 +55,20 @@ PowerShell:
 - Action Registry / Surface RegistryがSchemaに適合するか
 - 選択Profileが存在し、Profile / Surfaceに明らかな矛盾がないか
 - Manifest pathsとcommand cwdが存在するか
-- 推奨Profile / Runtime Moduleとの差分を警告する
+- Default CatalogがSchemaとsemantic規則に適合し、Default stateが `DEFAULT` / `OVERRIDE` / `DISABLED` のいずれかであるか
+- `DEFAULT` ToolがManifestの有効Surfaceと互換するか
+- Manifestなしの `migrate` ではpackage / Cargo / Python / workflow / web asset形状から候補をdry-run診断する
 - 定義済み共通コマンド
 
 環境固有診断は、後からKiNoTch. Runtimeのdoctor moduleとして追加可能とする。
 
 `base-refresh` は `repository-base` 自身でのみ使用するBase index再生成入口である。通常の個別Repositoryから共通ファイルを勝手に更新するためのコマンドではない。
+
+## init / migrate
+
+`knt init --profile <surface>` は `minimal`、`web-app`、`cli`、`windows-gui`（`windows` alias）、`mcp`、`api`、`agent`、`library` を複数選択し、TemplateからProject Overlayを生成する。`--default <tool-default>` で `ci-test`、`generated-integrity`、`file-io`、`pwa` の実装済みTool Defaultを選択できる。`knt verify` 自体はL1 Hard Baseの常設コマンドであり、Tool Default stateで無効化・生成する対象ではない。`cli` はJSON/error/exit/help helper、`windows` はExplorer/clipboard境界、`mcp` はtool naming/input/diagnostic境界、`api` はHTTP statusやcode体系を固定しないerror envelope schemaを生成する。`ci-test` はBase自身のworkflowとは別の非Deploy workflowを生成し、doctor → setup → verifyを実行する。`pwa` は相対base pathで動くmanifest / service worker / registration helper / check、`generated-integrity` はProject root内のsourceとartifact双方のSHA-256 metadata / stale check / update helper、`file-io` はUTF-8 text専用helperと形式非依存のProject callback境界を生成する。選択ProfileはSurface宣言と安全な補助だけを生成し、`runtime.modules` は空のまま保持する。既存の `project/project.json` または既存Projectファイルは上書きしない。
+
+`knt migrate` は既存ProjectのSurface / Tool Default候補を表示するだけで、既定ではファイルを変更しない。Project Manifestがない場合も、`-BaseOverride` を指定したBase routerからrepository shapeをread-only検出できる。`-BaseOverride` はshape probe専用であり、`init`、`migrate --apply`、Default materialization、Base mutationには使用できない。書込みには対象Repository自身の有効な `.kinotch/` とProject Manifestが必要である。`--apply` を明示した場合だけ `project/defaults.json` と必要なManifest pathを更新し、DEFAULT状態の安全な補助ファイルを不足分だけ生成する。既存の `OVERRIDE` / `DISABLED` 状態は保持し、同じ内容の既存ファイルはDEFAULTのまま、異なる内容の既存ファイルはOVERRIDEとして記録する。Domain fileは変更しない。
 
 ## Validatorの対応範囲
 
@@ -59,7 +78,7 @@ PowerShell:
 
 ## verify
 
-`project/project.json.commands.verify` があればそれを実行する。
+`generated-integrity` または `pwa` が `DEFAULT` で実装ファイルが存在する場合は、`knt verify` がそれぞれのcheckを先に実行する。続いて `project/project.json.commands.verify` があればそれを実行する。`knt verify` はL1 Hard Baseなので、Tool Defaultの選択や状態とは独立して常に利用できる。
 
 未定義の場合は、定義済みの `test` と `build` を順に実行する。これにより技術スタックが違ってもAgent・人間から見える操作語彙を固定する。
 

@@ -41,6 +41,14 @@
       "type": "string",
       "minLength": 1
     },
+    "profiles": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true
+    },
     "runtime": {
       "type": "object",
       "required": [
@@ -90,6 +98,32 @@
               "cwd": {
                 "type": "string",
                 "minLength": 1
+              }
+            },
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "required": [
+              "exec"
+            ],
+            "properties": {
+              "exec": {
+                "type": "string",
+                "minLength": 1
+              },
+              "args": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "cwd": {
+                "type": "string",
+                "minLength": 1
+              },
+              "forward_args": {
+                "type": "boolean"
               }
             },
             "additionalProperties": false

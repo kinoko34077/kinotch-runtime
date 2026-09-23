@@ -2,12 +2,6 @@
   "profile": "web-app",
   "status": "planned",
   "description": "Web/PWA。",
-  "runtime_modules": [
-    "kernel",
-    "errors",
-    "config",
-    "logging"
-  ],
   "surfaces": {
     "web": true
   }

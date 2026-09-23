@@ -2,10 +2,6 @@
   "profile": "library",
   "status": "planned",
   "description": "再利用library/package。",
-  "runtime_modules": [
-    "kernel",
-    "errors"
-  ],
   "surfaces": {
     "library": true
   }
