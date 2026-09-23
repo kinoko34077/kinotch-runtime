@@ -32,8 +32,8 @@ Last verified: 2026-09-23 — KiNoTch. Runtime v0.1 fourth/fifth Pilot design-pr
   semantics are PARTIAL GO through a test-only plain-object probe, while
   production Runtime integration remains HOLD.
 - Language-specific bindings have not started.
-- SynTrail-LM is being inspected at its exact `origin/main` commit as a
-  design-only third Pilot; its existing dirty user worktree was not modified.
+- SynTrail-LM third design probe is complete at its exact `origin/main` commit;
+  its existing dirty user worktree was not modified.
 - SynTrail-LM design probe result: Progress is PARTIAL GO; direct
   CancellationToken mapping is REJECTED/REVISE; Resource and Artifact are HOLD.
 - No SynTrail-LM production code, Rust Runtime crate, or Surface Pack was added.
