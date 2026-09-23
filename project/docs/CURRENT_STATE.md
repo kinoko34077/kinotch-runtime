@@ -4,7 +4,7 @@ Last verified: 2026-09-23 — KiNoTch. Runtime v0.1 fourth/fifth Pilot design-pr
 
 ## Implemented
 
-- Base v0.3.2 common layer (synced from the Repository Base)
+- Base v0.3.3 common layer (synced from the Repository Base)
 - Python reference Runtime package under `project/src/kinotch_runtime/`
 - Action registry and execution kernel
 - Structured result and extensible error values

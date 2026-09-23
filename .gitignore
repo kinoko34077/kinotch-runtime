@@ -27,6 +27,8 @@ logs/
 .tmp/
 tmp/
 *.log
+.wrangler/
+artifacts/
 
 # OS / editor
 .DS_Store
