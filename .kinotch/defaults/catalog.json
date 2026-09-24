@@ -106,6 +106,22 @@
       "default_state": "DEFAULT",
       "compatible_surfaces": ["web"],
       "aliases": []
+    },
+    {
+      "id": "config",
+      "kind": "tool",
+      "description": "Explicit configuration map merge and display redaction helpers。",
+      "default_state": "DEFAULT",
+      "compatible_surfaces": ["minimal", "web", "cli", "gui_windows", "mcp", "api", "agent", "library"],
+      "aliases": []
+    },
+    {
+      "id": "logging",
+      "kind": "tool",
+      "description": "Structured UTC logging and replaceable sink helpers。",
+      "default_state": "DEFAULT",
+      "compatible_surfaces": ["minimal", "web", "cli", "gui_windows", "mcp", "api", "agent", "library"],
+      "aliases": []
     }
   ]
 }

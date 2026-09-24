@@ -19,6 +19,7 @@
 5. [04_EXTRACTION_CRITERIA.md](04_EXTRACTION_CRITERIA.md) — Base / Runtimeへ抽象抽出する基準
 6. [05_VALIDATION_PLAN.md](05_VALIDATION_PLAN.md) — 実repoでの検証方法
 7. [06_DEFAULT_FIRST_STANDARD.md](06_DEFAULT_FIRST_STANDARD.md) — Default-first標準化方針
+8. [07_PHASE5_OPERATIONS.md](07_PHASE5_OPERATIONS.md) — Phase 5通常運用とBase freeze
 
 ## 位置づけ
 

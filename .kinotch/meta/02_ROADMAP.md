@@ -1,10 +1,11 @@
 # 02 — Roadmap
 
-Current position: Phase 5 — gradual repository adoption / maintenance.
+Current position: Phase 5 — gradual repository adoption / maintenance after the
+v0.5.0 Default feature slice.
 Phase 3B safe Default behavior, Phase 4A read-only Canary validation, Phase 4B
 adoption-safety hardening, and the Phase 4C adoption decision review are
 complete. Eight repositories are recorded as cleanly adopted at Base v0.3.8;
-Base v0.3.9 is the current maintenance release. Additional
+Base v0.5.0 is the current Surface Default Kit feature release. Additional
 repositories are explicitly staged, not adopted, or unavailable according to
 the operation-state table in `project/docs/DEFAULT_ROLLOUT_DRY_RUN.md`.
 Phase 2A Portable Contract validation remains independent and provisional;
@@ -105,6 +106,8 @@ Surface Default / Tool Defaultとして提供する。Projectからoverride / di
 - `generated-integrity`
 - `file-io`
 - `pwa`
+- `config`
+- `logging`
 
 Default identifier・互換Surface・説明の正本は
 `.kinotch/defaults/catalog.json` とする。
@@ -170,6 +173,14 @@ Domainを拘束しない実装を与える。
 - rate-limit hook
 - smoke / health
 
+### Agent / Config / Logging
+
+- `agent`: invocation context, diagnostics, capabilities, and named boundary hook
+- `config`: explicit map merge and caller-selected secret redaction
+- `logging`: UTC structured record, stderr rendering, and sink/redactor hooks
+
+These are L2 helpers. They do not define Portable Runtime semantics.
+
 ## Phase 4A — Read-only Canary validation
 
 Canaryごとのshape probeと既存検証を完了した。外部Baseを指定したshape
@@ -212,26 +223,31 @@ fileは自動書換えしない。Manifestなしのshape probeでは、既存相
 overrideはshape probe専用で、既存repoのapplyには使用しない。
 
 完了条件は全repoへのBase導入ではなく、代表repoごとの採用可否、Project
-failureとBase failureの分離、全repoの運用状態記録、およびBase v0.3.9の
-検証済み状態である。
+failureとBase failureの分離、全repoの運用状態記録、およびBase v0.5.0の
+Surface Default Kit検証済み状態である。
 
 ## Phase 5 — 既存repoへの段階導入 / maintenance (current)
 
 専用adoption campaignを継続せず、通常のProject作業に同期判断を組み込む。
-全repoを一括書換えしない。
+Base v0.5.0を基準版として固定し、全repoを一括書換えしない。
 
 - 改修するrepoから順次適用
 - project固有ロジックは無理に移動しない
 - 複数repoで反復確認できた知識だけBase / Runtimeへ昇格
 - 既存互換性を壊してまで形式統一しない
-- まず全所有repoへdry-runし、`DEFAULT` / `OVERRIDE` / `DISABLED` / `N/A`
-  を分類する
-- CanaryはWeb / Verify、Generated Integrity、CLI / MCP、File I/O / Windows、
-  APIの各系統から段階的に確認する
-- 既存repoを改修したときだけ、必要ならBase同期後に`doctor`、
+- activeになったrepoだけ、必要ならread-only shape probeまたは既存Base状態を確認する
+- `ADOPTED` / `STAGED` / `NOT_ADOPTED` / `N/A` の運用状態を維持し、
+  Default stateの `DEFAULT` / `OVERRIDE` / `DISABLED` と混同しない
+- 既存repoを改修するときだけ、必要ならBase同期後に`doctor`、
   `base-check`、既存`verify`を実行する
-- Phase 5で追うのは、Base導入repo数、Base version分布、doctor failure、
-  Base起因verify failure、および反復する`OVERRIDE`だけとする
+- Base変更は明確なBase bug、Security/Data loss、2repo以上の同一障害、
+  同一手作業の反復、または現行Defaultで安全に表現できない共通問題に限定する
+- 詳細な運用手順は [07_PHASE5_OPERATIONS.md](07_PHASE5_OPERATIONS.md) を参照する
+
+v0.5.0でSurface Kitの安全な実装範囲（CLI、Windows、MCP、API、Agent）と
+Tool Default（ci-test、generated-integrity、file-io、pwa、config、logging）を
+固定した。以後は実Projectで同じ手作業や障害が反復した場合だけ、追加のBase
+変更を検討する。
 
 ## Phase 6 — 安定化
 

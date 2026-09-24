@@ -71,7 +71,8 @@ function Get-BaseProtectedPaths {
 function Update-BaseIndex {
     param([Parameter(Mandatory=$true)][string]$Root)
 
-    $manifestPath = Join-Path $Root "project/project.json"
+    $resolvedRoot = (Resolve-Path -LiteralPath $Root).Path
+    $manifestPath = Join-Path $resolvedRoot "project/project.json"
     if (-not (Test-Path -LiteralPath $manifestPath -PathType Leaf)) {
         throw "project/project.json not found: $manifestPath"
     }
@@ -80,13 +81,13 @@ function Update-BaseIndex {
         throw "base-refresh is only available for project.type repository-base"
     }
 
-    $protectedPaths = @(Get-BaseProtectedPaths -Root $Root)
-    $inventoryPath = Join-Path $Root ".kinotch/FILE_INVENTORY.txt"
+    $protectedPaths = @(Get-BaseProtectedPaths -Root $resolvedRoot)
+    $inventoryPath = Join-Path $resolvedRoot ".kinotch/FILE_INVENTORY.txt"
     [IO.File]::WriteAllText($inventoryPath, ($protectedPaths -join [Environment]::NewLine) + [Environment]::NewLine, (New-Object System.Text.UTF8Encoding($false)))
 
     $entries = New-Object System.Collections.Generic.List[object]
     foreach ($relative in $protectedPaths) {
-        $path = Join-Path $Root $relative
+        $path = Join-Path $resolvedRoot $relative
         if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
             throw "Base protected file not found: $relative"
         }
@@ -96,14 +97,14 @@ function Update-BaseIndex {
         })
     }
 
-    $version = (Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $Root ".kinotch/BASE_VERSION")).Trim()
+    $version = (Get-Content -Raw -Encoding UTF8 -LiteralPath (Join-Path $resolvedRoot ".kinotch/BASE_VERSION")).Trim()
     $index = [pscustomobject]@{
         schema_version = 1
         base_version = $version
         files = $entries.ToArray()
     }
     $json = ConvertTo-Json $index -Depth 10
-    [IO.File]::WriteAllText((Join-Path $Root ".kinotch/base-files.json"), $json + [Environment]::NewLine, (New-Object System.Text.UTF8Encoding($false)))
+    [IO.File]::WriteAllText((Join-Path $resolvedRoot ".kinotch/base-files.json"), $json + [Environment]::NewLine, (New-Object System.Text.UTF8Encoding($false)))
 }
 
 if (-not [string]::IsNullOrWhiteSpace($BaseRoot)) {

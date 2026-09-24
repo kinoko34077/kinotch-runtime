@@ -1,83 +1,51 @@
 # KiNoTch. Base / Runtime Roadmap
 
-この文書は共通層から参照する短いRoadmap Indexである。
-背景・到達状態・判断基準・検証計画を含む詳細な設計Metaは [`../meta/README.md`](../meta/README.md) を参照する。
+この文書は共通層から参照する短いRoadmap Indexである。詳細な判断基準は
+[`../meta/README.md`](../meta/README.md) と各正本Metaを参照する。
 
-## Phase 0 — Repository Base v0.1系
+## Phase 0 / 0.5 — Repository Base
 
-- Base / Project境界
-- 共通AGENTS
-- Project Manifest
-- Action / Surface Contract
-- `knt` command router
-- doctor / verify / base-check
-- Spec / Current State / ADR骨格
-- Base / Runtime設計Meta
+- Base / Project境界、AGENTS、Manifest、Schema、knt router
+- doctor / verify / base-check / base-refresh
+- deterministic Base protection、self-test、Meta、Project template
 
-## Phase 0.5 — Repository Base v0.2 Hardening
+## Phase 1 — Runtime reference
 
-- Base自身のIdentityとSPEC / CURRENT_STATE
-- `.kinotch/meta/` と `.kinotch/templates/project/` の分離
-- Manifest / Action / Surface Schema validation
-- Profile / path / command diagnostics
-- Base self-test fixtures and runner
-- Deterministic `base-refresh` and strict Base protection
-- Runtime Contractの確定済み / 候補の分離
+- Python reference kernel and Runtime Execution Contract
+- Runtime packageとBaseの責任分離
 
-## Phase 1 — Runtime Kernel v0.1
+## Phase 2A — Portable Contract validation
 
-- Action / Result / Error / Progress / Resourceの最小実装
-- Config / filesystem / logging
-- 言語別の薄いbinding方針
-
-## Phase 2 — 代表repoで試験導入
-
-- CLI + MCP: `jev-audit`
-- Windows GUI + CLI: `SynTrail-LM`
-- API / Web: `kinotch-api` / `standby-display`
-- Portable Contractの成熟度と適用範囲を評価し、Runtimeをprovisionalに保つ
+- jev-audit、kinotch-api、SynTrail-LM、standby-display、dev_agentのPilot
+- Portable meaningの成熟度を評価する。Default導入をブロックしない。
 
 ## Phase 2B — Default extraction
 
-- Portable Contractの成熟を待たず、安全に外せる共通便利機能をDefault化する。
-- Surface DefaultとTool Defaultを分離する。
-- 正本は `.kinotch/defaults/catalog.json` とする。
+- `DEFAULT` / `OVERRIDE` / `DISABLED`
+- Surface DefaultとTool Defaultを分離
+- Catalog駆動init / migrateと非破壊境界
 
-## Phase 3A — KiNoTch. Default Catalog
+## Phase 3 — Default implementation
 
-- Surface: `minimal`, `web-app`, `cli`, `windows`, `mcp`, `api`, `agent`, `library`
-- Tool: `ci-test`, `generated-integrity`, `file-io`, `pwa`
-- `knt init`はProfile選択からRuntime moduleを自動注入しない。
-- 既存Framework・Project実装はOverrideとして保持できる。
+現行Base v0.5.0で安全な実装sliceを固定する。
 
-## Phase 3B — Actual Default behavior (safe slice complete)
+- Surface Kits: `minimal`, `web-app`, `cli`, `windows`, `mcp`, `api`, `agent`, `library`
+- Tool Defaults: `ci-test`, `generated-integrity`, `file-io`, `pwa`, `config`, `logging`
+- provenance、template-driven doctor、PWA finalization、CLI/API契約、Windows CI
 
-- `verify-binding` optional Project binding; the `knt verify` common router is L1
-- `ci-test` separate non-deploy doctor→setup→verify workflow template
-- `generated-integrity` source and artifact SHA-256 check/update templates
-- `web-app` / `pwa` relative-base manifest, service worker, registration, and check templates
-- `file-io` format-independent boundary and UTF-8 text-only helper
-- `cli` JSON/error/help/exit helper
-- `windows` Explorer/clipboard shell boundary
-- `mcp` tool boundary descriptor without a second registry
-- `api` permissive error-envelope schema without HTTP policy
-- No Domain format, deploy policy, or Runtime module is generated.
+## Phase 4 — init / migrate and Canary adoption
 
-## Phase 4 — init / migrate and existing repository adoption (complete)
+read-only probe、explicit apply、Base-local write boundary、OVERRIDE preservationを
+検証済み。既存repoへ一括適用せず、採用状態を個別に記録する。
 
-- `knt init --profile <surface> --default <tool-default>`
-- `knt migrate` dry-run / explicit `--apply`
-- Explicit apply materializes only missing safe helpers and preserves overrides.
-- Manifest-less repository-shape probe via a Base source override
-- generated artifact / stale check
-- 詳細doctor / conformance report
-- v0.3.9 maintenance hardening: atomic Default materialization, OS-aware
-  Project-root containment, and Surface/Manifest consistency
+## Phase 5 — gradual repository adoption / maintenance (current)
 
-## Phase 5 — 既存repoへ段階導入
+新規repoでは必要なDefaultを選択できる。既存repoはactiveな改修時だけ、既存実装を
+`OVERRIDE`として保持できるか確認し、必要なら明示的に同期する。Base変更は、複数repo
+で反復するbug・手作業・安全問題が確認された場合に限定する。
 
-一括書換えを行わず、保守・改修のタイミングで適用する。
+## Phase 6 — only if actual need appears
 
-## Phase 6 — 必要時のみ安定化拡張
-
-Version migration / multi-language binding / generated descriptors等は、実利用上必要になった場合のみ進める。
+Version migration、multi-language binding、generated descriptor等は、実Projectで
+現行DefaultやRuntime境界が不足した場合のみ検討する。Defaultを理由にRuntimeを
+拡大しない。

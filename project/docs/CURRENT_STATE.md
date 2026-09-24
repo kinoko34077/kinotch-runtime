@@ -1,10 +1,10 @@
 # Current State
 
-Last verified: 2026-09-24 — KiNoTch. Runtime v0.1 fourth/fifth Pilot design-probe evaluation complete; Base v0.3.9 common-layer sync verified
+Last verified: 2026-09-24 — KiNoTch. Runtime v0.1 fourth/fifth Pilot design-probe evaluation complete; embedded Repository Base v0.5.0 common-layer sync verified
 
 ## Implemented
 
-- Base v0.3.9 common layer (synced from the Repository Base)
+- Embedded Repository Base v0.5.0 common layer (synced from the Repository Base)
 - Python reference Runtime package under `project/src/kinotch_runtime/`
 - Action registry and execution kernel
 - Structured result and extensible error values
@@ -21,6 +21,7 @@ Last verified: 2026-09-24 — KiNoTch. Runtime v0.1 fourth/fifth Pilot design-pr
 - Limited `kinotch-api` second-Pilot design with implementation hold conditions
 - Separate Python reference and cross-language Contract classifications
 - Portable semantic candidate boundary documented separately from Python types
+- Runtime package remains `0.1.0`; the embedded Base update does not change Runtime execution semantics or the Runtime-owned Execution Contract.
 
 ## In progress
 

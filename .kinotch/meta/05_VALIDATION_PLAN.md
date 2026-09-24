@@ -4,12 +4,16 @@ Base / Runtimeは文書上きれいでも、個別repoが扱いづらくなる�
 
 ## 検証対象
 
+Portable ContractのPilot評価と、L2 Defaultの実用性評価を分ける。CLI JSON、
+exit code、Windows picker、MCP diagnostics、API health等は、まずDefaultとして
+安全に再利用できるかを確認する。Runtimeへ昇格させる証拠とは扱わない。
+
 ### 1. CLI + MCP系 — jev-audit
 
 確認するもの:
 
 - 同じAudit Coreを維持したままSurfaceを薄くできるか
-- CLI JSON / exit codeをRuntime化できるか
+- CLI JSON / exit codeをDefaultとして再利用できるか
 - MCP mappingがCoreへ侵入しないか
 - setup / doctorでPython環境検出を一般化できるか
 
@@ -18,7 +22,7 @@ Base / Runtimeは文書上きれいでも、個別repoが扱いづらくなる�
 確認するもの:
 
 - GUI optional featureを維持できるか
-- New/Open/Save/Save As/D&Dを共通Shellへ寄せられるか
+- New/Open/Save/Save As/D&DをWindows Surface Defaultへ寄せられるか
 - Progress / Pause / Resume / Cancelのうち何が一般化可能か
 - GUI依存がCoreへ逆流しないか
 
@@ -26,7 +30,7 @@ Base / Runtimeは文書上きれいでも、個別repoが扱いづらくなる�
 
 確認するもの:
 
-- Action / validation / error / request ID等を共通化できるか
+- request ID / health / validation hook / error envelopeをAPI Defaultとして再利用できるか
 - Cloudflare固有Service BindingをProject側に残せるか
 - auth / rate-limit / deploy policyを無理に一律化しないか
 

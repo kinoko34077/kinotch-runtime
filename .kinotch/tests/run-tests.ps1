@@ -330,6 +330,57 @@ Invoke-TestCase "Project path containment is OS-aware and rejects sibling escape
 Invoke-TestCase "valid minimal project passes doctor" {
     Invoke-KntFixture -Name "valid-minimal" -Command "doctor" -ExpectedExit 0
 }
+Invoke-TestCase "Manifest paths reject Project-root escapes" {
+    Invoke-KntFixture -Name "valid-minimal" -Command "doctor" -ExpectedExit 1 -Prepare {
+        param($root)
+        $outside = Join-Path (Split-Path -Parent $root) ((Split-Path -Leaf $root) + "-outside")
+        New-Item -ItemType Directory -Path (Join-Path $outside "docs") -Force | Out-Null
+        $manifestPath = Join-Path $root "project/project.json"
+        $manifest = Get-Content -Raw -Encoding UTF8 $manifestPath | ConvertFrom-Json
+        $manifest.paths.docs = "..\$((Split-Path -Leaf $outside))/docs"
+        [IO.File]::WriteAllText($manifestPath, (ConvertTo-Json $manifest -Depth 20) + [Environment]::NewLine, (New-Object System.Text.UTF8Encoding($false)))
+    } -AssertOutput {
+        param($root, $output)
+        Assert-True ($output -match "outside.*Project|contain|boundary|relative") "Manifest path escape was not rejected"
+    }
+    Invoke-KntFixture -Name "valid-minimal" -Command "doctor" -ExpectedExit 1 -Prepare {
+        param($root)
+        $outside = Join-Path (Split-Path -Parent $root) ((Split-Path -Leaf $root) + "-absolute-outside")
+        New-Item -ItemType Directory -Path (Join-Path $outside "docs") -Force | Out-Null
+        $manifestPath = Join-Path $root "project/project.json"
+        $manifest = Get-Content -Raw -Encoding UTF8 $manifestPath | ConvertFrom-Json
+        $manifest.paths.docs = Join-Path $outside "docs"
+        [IO.File]::WriteAllText($manifestPath, (ConvertTo-Json $manifest -Depth 20) + [Environment]::NewLine, (New-Object System.Text.UTF8Encoding($false)))
+    } -AssertOutput {
+        param($root, $output)
+        Assert-True ($output -match "outside.*Project|contain|boundary|relative") "Absolute Manifest path was not rejected"
+    }
+}
+Invoke-TestCase "command cwd rejects Repository-root escapes before execution" {
+    Invoke-KntFixture -Name "valid-minimal" -Command "test" -ExpectedExit 1 -Prepare {
+        param($root)
+        $outside = Join-Path (Split-Path -Parent $root) ((Split-Path -Leaf $root) + "-command-outside")
+        New-Item -ItemType Directory -Path $outside -Force | Out-Null
+        $manifestPath = Join-Path $root "project/project.json"
+        $manifest = Get-Content -Raw -Encoding UTF8 $manifestPath | ConvertFrom-Json
+        $manifest.commands.test = [pscustomobject]@{
+            exec = "pwsh"
+            args = @("-NoProfile", "-Command", "Write-Output escaped")
+            cwd = "..\$((Split-Path -Leaf $outside))"
+            forward_args = $false
+        }
+        [IO.File]::WriteAllText($manifestPath, (ConvertTo-Json $manifest -Depth 20) + [Environment]::NewLine, (New-Object System.Text.UTF8Encoding($false)))
+    } -AssertOutput {
+        param($root, $output)
+        Assert-True ($output -match "outside.*Repository|contain|boundary|cwd") "Command cwd escape was not rejected"
+        Assert-True ($output -notmatch "escaped") "Escaped command was executed"
+    }
+}
+Invoke-TestCase "Base manifest keeps Runtime modules empty" {
+    $manifest = Get-Content -Raw -Encoding UTF8 (Join-Path $RepoRoot "project/project.json") | ConvertFrom-Json
+    Assert-Equal "repository-base" $manifest.project.type "Base project type"
+    Assert-Equal 0 @($manifest.runtime.modules).Count "Base Runtime module declaration"
+}
 Invoke-TestCase "valid command string remains accepted" {
     Invoke-KntFixture -Name "valid-minimal" -Command "doctor" -ExpectedExit 0
 }
@@ -432,6 +483,11 @@ Invoke-TestCase "init creates a doctor-valid multi-profile Project" {
     }
 }
 Invoke-TestCase "Tool Defaults require a compatible selected Surface" {
+    Invoke-KntInitFixture -Profiles @("minimal") -Defaults @("ci-test") -RemoveExistingCi -AssertOutput {
+        param($root, $output)
+        $defaults = Get-Content -Raw -Encoding UTF8 (Join-Path $root "project/defaults.json") | ConvertFrom-Json
+        Assert-Equal "DEFAULT" $defaults.packs."ci-test".state "minimal + ci-test state"
+    }
     Invoke-KntInitFixture -Profiles @("minimal") -Defaults @("pwa") -ExpectedExit 2 -AssertOutput {
         param($root, $output)
         Assert-True ($output -match "not compatible|requires.*Surface") "minimal + pwa was accepted"
@@ -444,6 +500,11 @@ Invoke-TestCase "Tool Defaults require a compatible selected Surface" {
         param($root, $output)
         $defaults = Get-Content -Raw -Encoding UTF8 (Join-Path $root "project/defaults.json") | ConvertFrom-Json
         Assert-Equal "DEFAULT" $defaults.packs.pwa.state "web-app + pwa state"
+    }
+    Invoke-KntInitFixture -Profiles @("windows-gui") -Defaults @("file-io") -AssertOutput {
+        param($root, $output)
+        $defaults = Get-Content -Raw -Encoding UTF8 (Join-Path $root "project/defaults.json") | ConvertFrom-Json
+        Assert-Equal "DEFAULT" $defaults.packs."file-io".state "windows + file-io state"
     }
 }
 Invoke-TestCase "init accepts all catalog surface profiles without Runtime injection" {
@@ -472,6 +533,62 @@ Invoke-TestCase "surface Defaults materialize safe CLI, Windows, MCP, and API he
         }
         Assert-True ($output -match "Surface Default 'cli' added") "CLI surface Default was not materialized"
         Assert-True ($output -match "Surface Default 'api' added") "API surface Default was not materialized"
+    }
+}
+Invoke-TestCase "CLI Surface Kit preserves Project arguments and separates output streams" {
+    Invoke-KntInitFixture -Profiles @("cli") -AssertOutput {
+        param($root, $output)
+        $helper = Join-Path $root "project/tools/cli-default.ps1"
+        $probe = Join-Path $root "cli-kit-probe.ps1"
+        $probeText = @'
+param(
+    [Parameter(Mandatory=$true)][string]$HelperPath,
+    [Parameter(Mandatory=$true)][ValidateSet("parse", "output", "exit")][string]$Mode
+)
+$ErrorActionPreference = "Stop"
+. $HelperPath
+switch ($Mode) {
+    "parse" {
+        $options = Get-CliCommonOptions @("--json", "--quiet", "--verbose", "--dry-run", "--yes", "--domain-value")
+        if (-not $options.Json -or -not $options.Quiet -or -not $options.Verbose -or -not $options.DryRun -or -not $options.Yes) { throw "common flags were not parsed" }
+        if ($options.RemainingArgs.Count -ne 1 -or $options.RemainingArgs[0] -ne "--domain-value") { throw "Project argument was consumed" }
+        $terminated = Get-CliCommonOptions @("--json", "--", "--help", "--domain")
+        if (-not $terminated.Json -or $terminated.Help) { throw "CLI option terminator changed Default option parsing" }
+        if ($terminated.RemainingArgs.Count -ne 3 -or $terminated.RemainingArgs[0] -ne "--" -or $terminated.RemainingArgs[1] -ne "--help" -or $terminated.RemainingArgs[2] -ne "--domain") { throw "CLI option terminator did not preserve Project arguments" }
+        Write-Output "parse-ok"
+    }
+    "output" {
+        Write-CliOutput -Message "normal"
+        Write-CliOutput -Message "hidden" -Quiet
+        Write-CliDiagnostic -Message "hidden-diagnostic"
+        Write-CliDiagnostic -Message "diagnostic" -VerboseOutput
+        Write-CliJson -Value ([pscustomobject]@{ kind = "json" })
+        Write-CliResult -Value ([pscustomobject]@{ kind = "result" }) -Json
+    }
+    "exit" {
+        Exit-Cli -Code 7
+    }
+}
+'@
+        Set-Content -LiteralPath $probe -Value $probeText -Encoding UTF8
+        $parseOutput = @(& $PowerShellExecutable -NoProfile -ExecutionPolicy Bypass -File $probe -HelperPath $helper -Mode parse 2>&1)
+        Assert-Equal 0 $LASTEXITCODE "CLI common option probe exit code"
+        Assert-True (($parseOutput -join "`n") -match "parse-ok") "CLI common option probe did not complete"
+
+        $stderrPath = Join-Path $root "cli-kit.stderr"
+        $stdoutOutput = @(& $PowerShellExecutable -NoProfile -ExecutionPolicy Bypass -File $probe -HelperPath $helper -Mode output 2> $stderrPath)
+        Assert-Equal 0 $LASTEXITCODE "CLI output probe exit code"
+        $stdoutText = $stdoutOutput -join "`n"
+        $stderrText = if (Test-Path -LiteralPath $stderrPath) { Get-Content -Raw -Encoding UTF8 $stderrPath } else { "" }
+        Assert-True ($stdoutText -match "normal") "CLI stdout helper did not write normal output"
+        Assert-True ($stdoutText -notmatch "hidden") "CLI quiet output was not suppressed"
+        Assert-True ($stdoutText -match '"kind":"json"') "CLI JSON output was not emitted"
+        Assert-True ($stdoutText -match '"kind":"result"') "CLI result JSON was not emitted"
+        Assert-True ($stderrText -match "diagnostic") "CLI diagnostic was not written to stderr"
+        Assert-True ($stderrText -notmatch "hidden-diagnostic") "CLI non-verbose diagnostic was not suppressed"
+
+        $exitOutput = @(& $PowerShellExecutable -NoProfile -ExecutionPolicy Bypass -File $probe -HelperPath $helper -Mode exit 2>&1)
+        Assert-Equal 7 $LASTEXITCODE "CLI exit helper code"
     }
 }
 Invoke-TestCase "init records selected Tool Defaults from the catalog" {
@@ -519,6 +636,58 @@ Invoke-TestCase "init materializes safe Default implementations" {
         Set-Content -LiteralPath (Join-Path $root "project/source.txt") -Value "source-v2" -NoNewline
         @(& $PowerShellExecutable -NoProfile -ExecutionPolicy Bypass -File $router -RootOverride $root generated-integrity 2>&1) | Out-Null
         Assert-Equal 1 $LASTEXITCODE "generated-integrity source-stale exit code"
+    }
+}
+Invoke-TestCase "materialized Defaults record final file provenance" {
+    Invoke-KntInitFixture -Profiles @("web-app") -Defaults @("pwa") -AssertOutput {
+        param($root, $output)
+        $defaults = Get-Content -Raw -Encoding UTF8 (Join-Path $root "project/defaults.json") | ConvertFrom-Json
+        $pack = $defaults.packs.pwa
+        $baseVersion = (Get-Content -Raw -Encoding UTF8 (Join-Path $root ".kinotch/BASE_VERSION")).Trim()
+        Assert-Equal $baseVersion $pack.source_base_version "PWA Default source Base version"
+        $manifestFile = @($pack.materialized_files | Where-Object { $_.path -eq "project/public/manifest.webmanifest" })
+        Assert-Equal 1 $manifestFile.Count "PWA manifest provenance entry"
+        Assert-True ([string]$manifestFile[0].sha256 -match "^[0-9a-f]{64}$") "PWA provenance hash"
+    }
+}
+Invoke-TestCase "doctor rejects a modified provenance-tracked Default" {
+    Invoke-KntInitFixture -Profiles @("web-app") -Defaults @("pwa") -AssertOutput {
+        param($root, $output)
+        Add-Content -LiteralPath (Join-Path $root "project/public/service-worker.js") -Value "// project modification"
+        $router = Join-Path $root ".kinotch/scripts/knt.ps1"
+        $doctorOutput = @(& $PowerShellExecutable -NoProfile -ExecutionPolicy Bypass -File $router -RootOverride $root doctor 2>&1)
+        Assert-Equal 1 $LASTEXITCODE "modified Default doctor exit code"
+        Assert-True (($doctorOutput -join "`n") -match "DEFAULT implementation was modified|provenance|OVERRIDE") "modified Default was not reported"
+    }
+}
+Invoke-TestCase "PWA init and migrate use the same finalization" {
+    $script:pwaInitParity = $null
+    Invoke-KntInitFixture -Profiles @("web-app") -Defaults @("pwa") -AssertOutput {
+        param($root, $output)
+        $manifest = Get-Content -Raw -Encoding UTF8 (Join-Path $root "project/public/manifest.webmanifest") | ConvertFrom-Json
+        $script:pwaInitParity = @{
+            name = [string]$manifest.name
+            short_name = [string]$manifest.short_name
+            start_url = [string]$manifest.start_url
+            display = [string]$manifest.display
+        }
+    }
+    Invoke-KntFixture -Name "valid-minimal" -Command "doctor" -ExpectedExit 0 -Prepare {
+        param($root)
+        $manifestPath = Join-Path $root "project/project.json"
+        $manifest = Get-Content -Raw -Encoding UTF8 $manifestPath | ConvertFrom-Json
+        $manifest.project.name = $script:pwaInitParity.name
+        $manifest.surfaces.web = $true
+        [IO.File]::WriteAllText($manifestPath, (ConvertTo-Json $manifest -Depth 20) + [Environment]::NewLine, (New-Object System.Text.UTF8Encoding($false)))
+    } -AssertOutput {
+        param($root, $output)
+        $router = Join-Path $root ".kinotch/scripts/knt.ps1"
+        @(& $PowerShellExecutable -NoProfile -ExecutionPolicy Bypass -File $router -RootOverride $root migrate --apply --default pwa 2>&1) | Out-Null
+        Assert-Equal 0 $LASTEXITCODE "PWA migrate apply exit code"
+        $manifest = Get-Content -Raw -Encoding UTF8 (Join-Path $root "project/public/manifest.webmanifest") | ConvertFrom-Json
+        foreach ($field in @("name", "short_name", "start_url", "display")) {
+            Assert-Equal $script:pwaInitParity[$field] ([string]$manifest.$field) "PWA parity $field"
+        }
     }
 }
 Invoke-TestCase "Default materialization is atomic when an init template conflicts" {
@@ -904,10 +1073,231 @@ Invoke-TestCase "Windows helper uses a Windows PowerShell 5.1-compatible host ch
     Assert-True ($helper -match '\$env:OS\s*-eq\s*"Windows_NT"') "Windows helper does not use the Windows_NT environment marker"
     Assert-True ($helper -notmatch '\$IsWindows') "Windows helper relies on the PowerShell Core-only IsWindows variable"
 }
+Invoke-TestCase "Windows Surface Kit provides path, drop, picker, progress, and cancel helpers" {
+    Invoke-KntInitFixture -Profiles @("windows-gui") -AssertOutput {
+        param($root, $output)
+        $helper = Join-Path $root "project/tools/windows-shell.ps1"
+        $probe = Join-Path $root "windows-kit-probe.ps1"
+        $existing = Join-Path $root "project/input.txt"
+        Set-Content -LiteralPath $existing -Value "input" -Encoding UTF8
+        $probeText = @'
+param(
+    [Parameter(Mandatory=$true)][string]$HelperPath,
+    [Parameter(Mandatory=$true)][string]$ExistingPath
+)
+$ErrorActionPreference = "Stop"
+. $HelperPath
+$normalized = Resolve-WindowsShellPath -Path $ExistingPath
+if ($normalized -ne (Resolve-Path -LiteralPath $ExistingPath).Path) { throw "path was not normalized" }
+$drop = @(Convert-WindowsDropItems -Paths @($ExistingPath, "", "  "))
+if ($drop.Count -ne 1 -or $drop[0] -ne $normalized) { throw "drop paths were not normalized" }
+if ($null -ne (Convert-WindowsDropItems -Paths @("", "  "))) { throw "empty drop was not cancelled" }
+if ((Select-WindowsPath -Kind File -SelectedPath "") -ne $null) { throw "cancelled file picker did not return null" }
+if ((Save-WindowsPath -SelectedPath "") -ne $null) { throw "cancelled save picker did not return null" }
+$cancel = New-WindowsCancelSource
+if (Test-WindowsCancelRequested -Source $cancel) { throw "new cancel source is already requested" }
+Request-WindowsCancel -Source $cancel
+if (-not (Test-WindowsCancelRequested -Source $cancel)) { throw "cancel request was not observed" }
+$progress = New-WindowsProgressState -Stage "load" -Total 2
+if ($progress.status -ne "started") { throw "progress did not start" }
+Update-WindowsProgressState -State $progress -Current 1 -Message "half"
+if ($progress.status -ne "progress" -or $progress.current -ne 1 -or $progress.message -ne "half") { throw "progress update was not recorded" }
+Complete-WindowsProgressState -State $progress
+if ($progress.status -ne "completed") { throw "progress did not complete" }
+$failed = New-WindowsProgressState -Stage "save" -Total 1
+Fail-WindowsProgressState -State $failed -Message "failed"
+if ($failed.status -ne "failed" -or $failed.message -ne "failed") { throw "progress failure was not recorded" }
+Write-Output "windows-kit-ok"
+'@
+        Set-Content -LiteralPath $probe -Value $probeText -Encoding UTF8
+        $probeOutput = @(& $PowerShellExecutable -NoProfile -ExecutionPolicy Bypass -File $probe -HelperPath $helper -ExistingPath $existing 2>&1)
+        Assert-Equal 0 $LASTEXITCODE "Windows Surface Kit probe exit code"
+        Assert-True (($probeOutput -join "`n") -match "windows-kit-ok") "Windows Surface Kit probe did not complete"
+    }
+}
+Invoke-TestCase "MCP Surface Kit describes reusable boundary hooks without a second registry" {
+    Invoke-KntInitFixture -Profiles @("mcp") -AssertOutput {
+        param($root, $output)
+        $descriptor = Get-Content -Raw -Encoding UTF8 (Join-Path $root "project/contracts/mcp-tools.json") | ConvertFrom-Json
+        Assert-True ($descriptor.tool_name_pattern -eq '^[a-z][a-z0-9_.-]*$') "MCP naming boundary changed"
+        Assert-True ($descriptor.input_schema_validation -eq $true) "MCP input validation hook missing"
+        Assert-True ($descriptor.resource_path_resolution -eq $true) "MCP resource path resolution missing"
+        Assert-True ($descriptor.error_conversion -eq $true) "MCP error conversion boundary missing"
+        Assert-True ($descriptor.dispatch.use_existing_framework -eq $true) "MCP descriptor requests a second dispatcher"
+    }
+}
+Invoke-TestCase "MCP executable Surface Kit provides safe boundary helpers" {
+    Invoke-KntInitFixture -Profiles @("mcp") -AssertOutput {
+        param($root, $output)
+        $helper = Join-Path $root "project/tools/mcp-default.ps1"
+        Assert-True (Test-Path -LiteralPath $helper -PathType Leaf) "MCP executable helper was not materialized"
+        $probe = Join-Path $root "mcp-kit-probe.ps1"
+        $probeText = @'
+param([Parameter(Mandatory=$true)][string]$HelperPath,[Parameter(Mandatory=$true)][string]$ProjectRoot)
+$ErrorActionPreference = "Stop"
+. $HelperPath
+if (-not (Test-McpToolName -Name "text.transform")) { throw "valid MCP tool name was rejected" }
+if (Test-McpToolName -Name "Invalid Tool") { throw "invalid MCP tool name was accepted" }
+$validated = Invoke-McpInputValidator -InputObject ([pscustomobject]@{ value = 1 }) -Validator { param($value) $script:validatorCalled = $true; return $value }
+if (-not $script:validatorCalled -or $validated.value -ne 1) { throw "MCP validator callback was not invoked" }
+$resolved = Resolve-McpProjectPath -ProjectRoot $ProjectRoot -RelativePath "src"
+if (-not $resolved.StartsWith($ProjectRoot, [StringComparison]::OrdinalIgnoreCase)) { throw "MCP path was not resolved under Project root" }
+try { Resolve-McpProjectPath -ProjectRoot $ProjectRoot -RelativePath "../outside"; throw "MCP path escape was accepted" } catch { if ($_.Exception.Message -notmatch "relative|boundary|escape") { throw } }
+$diagnostic = New-McpDiagnostic -Level "info" -Message "ready" -Data @{ source = "test" }
+$errorEnvelope = New-McpErrorEnvelope -Code "invalid_input" -Message "bad" -Details @{ field = "value" }
+$capabilities = New-McpCapabilities -Version "1.0.0" -Capabilities @("diagnostics")
+if ($diagnostic.message -ne "ready" -or $errorEnvelope.error -ne "invalid_input" -or $capabilities.version -ne "1.0.0") { throw "MCP boundary helper output was incomplete" }
+Write-Output "mcp-kit-ok"
+'@
+        Set-Content -LiteralPath $probe -Value $probeText -Encoding UTF8
+        $probeOutput = @(& $PowerShellExecutable -NoProfile -ExecutionPolicy Bypass -File $probe -HelperPath $helper -ProjectRoot (Join-Path $root "project") 2>&1)
+        Assert-Equal 0 $LASTEXITCODE "MCP executable helper probe exit code"
+        Assert-True (($probeOutput -join "`n") -match "mcp-kit-ok") "MCP executable helper probe did not complete"
+        $helperText = Get-Content -Raw -Encoding UTF8 $helper
+        Assert-True ($helperText -notmatch "ActionRegistry|Tool Registry|function .*Dispatcher") "MCP helper introduced a second registry or dispatcher"
+    }
+}
+Invoke-TestCase "Agent Surface Kit provides a dependency-free boundary" {
+    Invoke-KntInitFixture -Profiles @("agent") -AssertOutput {
+        param($root, $output)
+        $helper = Join-Path $root "project/tools/agent-default.ps1"
+        Assert-True (Test-Path -LiteralPath $helper -PathType Leaf) "Agent helper was not materialized"
+        $probe = Join-Path $root "agent-kit-probe.ps1"
+        $probeText = @'
+param([Parameter(Mandatory=$true)][string]$HelperPath)
+$ErrorActionPreference = "Stop"
+. $HelperPath
+$context = New-AgentInvocationContext -RequestId "req-1" -CorrelationId "corr-1" -InputObject @{ task = "run" } -Metadata @{ source = "test" }
+if ($context.requestId -ne "req-1" -or $context.correlationId -ne "corr-1" -or $context.input.task -ne "run" -or $context.metadata.source -ne "test") { throw "Agent invocation context was not preserved" }
+$diagnostic = New-AgentDiagnostic -Level "info" -Message "ready"
+$report = New-AgentCapabilityReport -Version "1.0.0" -Capabilities @("invoke")
+$hooked = Invoke-AgentBoundaryHook -Name "before" -Value "input" -Hook { param($value, $name) return ($value + "-" + $name) }
+if ($diagnostic.message -ne "ready" -or $report.version -ne "1.0.0" -or $hooked -ne "input-before") { throw "Agent boundary helper output was incomplete" }
+Write-Output "agent-kit-ok"
+'@
+        Set-Content -LiteralPath $probe -Value $probeText -Encoding UTF8
+        $probeOutput = @(& $PowerShellExecutable -NoProfile -ExecutionPolicy Bypass -File $probe -HelperPath $helper 2>&1)
+        Assert-Equal 0 $LASTEXITCODE "Agent helper probe exit code"
+        Assert-True (($probeOutput -join "`n") -match "agent-kit-ok") "Agent helper probe did not complete"
+        $helperText = Get-Content -Raw -Encoding UTF8 $helper
+        Assert-True ($helperText -notmatch "Planner|Memory|AgentBackend|ResourceLedger") "Agent helper captured Project-owned policy"
+    }
+}
+Invoke-TestCase "Base CI workflow covers Ubuntu pwsh and Windows PowerShell hosts" {
+    foreach ($workflowPath in @(
+        (Join-Path $RepoRoot ".github/workflows/verify.yml"),
+        (Join-Path $RepoRoot ".kinotch/templates/defaults/ci-test/.github/workflows/kinotch-default.yml")
+    )) {
+        $workflow = Get-Content -Raw -Encoding UTF8 $workflowPath
+        Assert-True ($workflow -match "ubuntu-latest") "CI workflow is missing Ubuntu"
+        Assert-True ($workflow -match "windows-latest") "CI workflow is missing Windows"
+        Assert-True ($workflow -match "powershell") "CI workflow is missing Windows PowerShell 5.1"
+        Assert-True ($workflow -match "pwsh") "CI workflow is missing PowerShell Core"
+    }
+}
 Invoke-TestCase "API Default envelope remains a permissive boundary descriptor" {
     $schema = Get-Content -Raw -Encoding UTF8 (Join-Path $RepoRoot ".kinotch/templates/defaults/api/contracts/api-error-envelope.json") | ConvertFrom-Json
     Assert-True (@($schema.required) -notcontains "details") "API Default made details mandatory"
     Assert-True ($schema.additionalProperties -eq $true) "API Default rejects Project-owned extensions"
+    Assert-True ($null -eq $schema.properties.details.type) "API Default details is narrower than the helper"
+    $envelopes = @(
+        [pscustomobject]@{ error = "invalid_input"; message = "bad"; details = @{ field = "value" } },
+        [pscustomobject]@{ error = "invalid_input"; message = "bad"; details = @("value") },
+        [pscustomobject]@{ error = "invalid_input"; message = "bad"; details = "value" },
+        [pscustomobject]@{ error = "invalid_input"; message = "bad"; details = 7 },
+        [pscustomobject]@{ error = "invalid_input"; message = "bad" }
+    )
+    foreach ($envelope in $envelopes) {
+        Assert-Equal 0 @(Test-KntSchema -Data $envelope -Schema $schema -Path "fixture.api-error").Count "API envelope schema compatibility"
+    }
+}
+Invoke-TestCase "API Surface Kit provides replaceable context, health, envelope, and hooks" {
+    Invoke-KntInitFixture -Profiles @("api") -AssertOutput {
+        param($root, $output)
+        $helper = Join-Path $root "project/tools/api-default.ps1"
+        Assert-True (Test-Path -LiteralPath $helper -PathType Leaf) "API Surface Kit helper was not materialized"
+        $probe = Join-Path $root "api-kit-probe.ps1"
+        $probeText = @'
+param([Parameter(Mandatory=$true)][string]$HelperPath)
+$ErrorActionPreference = "Stop"
+. $HelperPath
+$context = New-ApiRequestContext -RequestId "req-1" -CorrelationId "corr-1"
+if ($context.requestId -ne "req-1" -or $context.correlationId -ne "corr-1") { throw "request context was not preserved" }
+$generated = New-ApiRequestContext
+if ([string]::IsNullOrWhiteSpace($generated.requestId) -or [string]::IsNullOrWhiteSpace($generated.correlationId)) { throw "request context IDs were not generated" }
+$health = New-ApiHealthResponse -Name "sample"
+if ($health.status -ne "ok" -or $health.name -ne "sample") { throw "health response was not created" }
+$errorEnvelope = New-ApiErrorEnvelope -Code "invalid_input" -Message "bad input" -Details @{ field = "value" } -RequestId "req-1"
+if ($errorEnvelope.error -ne "invalid_input" -or $errorEnvelope.message -ne "bad input" -or $errorEnvelope.requestId -ne "req-1") { throw "error envelope was not preserved" }
+$hooked = Invoke-ApiHook -Name "validation" -Value "input" -Hook { param($value) return ($value + "-checked") }
+if ($hooked -ne "input-checked") { throw "API hook was not invoked" }
+$namedHook = Invoke-ApiHook -Name "auth" -Value "input" -Hook { param($value, $name) return ($value + "-" + $name) }
+if ($namedHook -ne "input-auth") { throw "API hook name was not forwarded" }
+$unchanged = Invoke-ApiHook -Name "auth" -Value "input"
+if ($unchanged -ne "input") { throw "missing API hook changed the value" }
+Write-Output "api-kit-ok"
+'@
+        Set-Content -LiteralPath $probe -Value $probeText -Encoding UTF8
+        $probeOutput = @(& $PowerShellExecutable -NoProfile -ExecutionPolicy Bypass -File $probe -HelperPath $helper 2>&1)
+        Assert-Equal 0 $LASTEXITCODE "API Surface Kit probe exit code"
+        Assert-True (($probeOutput -join "`n") -match "api-kit-ok") "API Surface Kit probe did not complete"
+    }
+}
+Invoke-TestCase "Config Tool Default merges maps and redacts only explicit keys" {
+    Invoke-KntInitFixture -Profiles @("minimal") -Defaults @("config") -AssertOutput {
+        param($root, $output)
+        $helper = Join-Path $root "project/tools/config-default.ps1"
+        Assert-True (Test-Path -LiteralPath $helper -PathType Leaf) "Config Default helper was not materialized"
+        $probe = Join-Path $root "config-default-probe.ps1"
+        $probeText = @'
+param([Parameter(Mandatory=$true)][string]$HelperPath)
+$ErrorActionPreference = "Stop"
+. $HelperPath
+$defaults = [ordered]@{ value = "default"; keep = "yes"; empty = ""; token = "secret" }
+$file = [ordered]@{ value = "file"; fileOnly = $true; token = "file-secret" }
+$environment = [ordered]@{ value = "environment"; environmentOnly = $true }
+$cli = [ordered]@{ value = "cli"; cliOnly = $true }
+$merged = Merge-KntConfigMaps -Maps @($defaults, $file, $environment, $cli)
+if ($merged.value -ne "cli" -or $merged.keep -ne "yes" -or -not $merged.fileOnly -or -not $merged.environmentOnly -or -not $merged.cliOnly -or $merged.empty -ne "") { throw "Config precedence or unknown-key merge failed" }
+$protected = Protect-KntConfigForDisplay -Config $merged -SecretKeys @("token")
+if ($protected.token -ne "[REDACTED]" -or $merged.token -ne "file-secret" -or $defaults.token -ne "secret" -or $protected.keep -ne "yes") { throw "Config explicit redaction was not non-destructive" }
+Write-Output "config-default-ok"
+'@
+        Set-Content -LiteralPath $probe -Value $probeText -Encoding UTF8
+        $probeOutput = @(& $PowerShellExecutable -NoProfile -ExecutionPolicy Bypass -File $probe -HelperPath $helper 2>&1)
+        Assert-Equal 0 $LASTEXITCODE "Config Default probe exit code"
+        Assert-True (($probeOutput -join "`n") -match "config-default-ok") "Config Default probe did not complete"
+    }
+}
+Invoke-TestCase "Logging Tool Default writes structured records to stderr" {
+    Invoke-KntInitFixture -Profiles @("minimal") -Defaults @("logging") -AssertOutput {
+        param($root, $output)
+        $helper = Join-Path $root "project/tools/logging-default.ps1"
+        Assert-True (Test-Path -LiteralPath $helper -PathType Leaf) "Logging Default helper was not materialized"
+        $probe = Join-Path $root "logging-default-probe.ps1"
+        $probeText = @'
+param([Parameter(Mandatory=$true)][string]$HelperPath)
+$ErrorActionPreference = "Stop"
+. $HelperPath
+$record = New-KntLogRecord -Level "warning" -Message "ready" -Data @{ source = "test" }
+if ($record.level -ne "warning" -or $record.message -ne "ready" -or [string]::IsNullOrWhiteSpace($record.timestamp)) { throw "Log record was incomplete" }
+[DateTimeOffset]::Parse($record.timestamp) | Out-Null
+$sinkSeen = $null
+$redacted = Invoke-KntLogSink -Record $record -Redactor { param($value) return [pscustomobject]@{ timestamp = $value.timestamp; level = $value.level; message = $value.message; data = @{ source = "redacted" } } } -Sink { param($value) $script:sinkSeen = $value; return $value }
+if ($null -eq $sinkSeen -or $sinkSeen.data.source -ne "redacted" -or $redacted.data.source -ne "redacted") { throw "Log sink or redactor hook was not invoked" }
+Write-KntConsoleLog -Record $record -Json
+[Console]::Out.WriteLine("stdout-marker")
+'@
+        Set-Content -LiteralPath $probe -Value $probeText -Encoding UTF8
+        $stderrPath = Join-Path $root "logging-default.stderr"
+        $stdout = @(& $PowerShellExecutable -NoProfile -ExecutionPolicy Bypass -File $probe -HelperPath $helper 2> $stderrPath)
+        Assert-Equal 0 $LASTEXITCODE "Logging Default probe exit code"
+        Assert-True (($stdout -join "`n") -match "stdout-marker") "Logging probe did not complete"
+        $stderr = Get-Content -Raw -Encoding UTF8 $stderrPath | ConvertFrom-Json
+        Assert-Equal "warning" $stderr.level "structured log level"
+        Assert-Equal "ready" $stderr.message "structured log message"
+        Assert-True (-not (($stdout -join "`n") -match "ready|warning")) "Logging polluted stdout"
+    }
 }
 Invoke-TestCase "oneOf requires exactly one matching schema" {
     $schema = [pscustomobject]@{
@@ -1070,10 +1460,11 @@ Invoke-TestCase "base-refresh indexes new common file" {
     }
 }
 
-Invoke-TestCase "Base documentation and profile status are finalized" {
+Invoke-TestCase "Base documentation and profile metadata are finalized" {
     $spec = Get-Content -Raw (Join-Path $RepoRoot "project/docs/SPEC.md")
     $state = Get-Content -Raw (Join-Path $RepoRoot "project/docs/CURRENT_STATE.md")
     $runtime = Get-Content -Raw (Join-Path $RepoRoot ".kinotch/RUNTIME_INTEGRATION.md")
+    $baseReadme = Get-Content -Raw (Join-Path $RepoRoot ".kinotch/README_BASE.md")
     $workflow = Get-Content -Raw (Join-Path $RepoRoot ".github/workflows/verify.yml")
     $surfaceRegistry = Get-Content -Raw (Join-Path $RepoRoot "project/contracts/surfaces.json") | ConvertFrom-Json
     $catalog = Get-Content -Raw (Join-Path $RepoRoot ".kinotch/defaults/catalog.json") | ConvertFrom-Json
@@ -1085,13 +1476,18 @@ Invoke-TestCase "Base documentation and profile status are finalized" {
     Assert-True ($runtime -match "Action Result") "Runtime defined-contract content is missing"
     Assert-True ($runtime -match "ActionRequest") "Runtime candidate-contract content is missing"
     Assert-True ($workflow -match "knt\.ps1 setup") "Base CI setup step is missing"
+    Assert-True ($workflow -match "actions/checkout@[0-9a-f]{40}(?:\s+#\s+v4)?") "Base Verify checkout action is not pinned to a full commit SHA"
     Assert-Equal 0 @($surfaceRegistry.surfaces.PSObject.Properties).Count "Base Surface Registry should be empty"
-    Assert-Equal "0.3.9" $baseVersion "Base version"
+    Assert-Equal "0.5.0" $baseVersion "Base version"
+    Assert-True ($baseReadme -match "Surface Default Kit") "README_BASE Surface Kit wording is missing"
+    Assert-True ($baseReadme -match "OVERRIDE") "README_BASE override boundary is missing"
     Assert-True (@($catalog.defaults | Where-Object { $_.kind -eq "surface" }).Count -ge 8) "Surface Default catalog entries are incomplete"
-    Assert-Equal 4 @($catalog.defaults | Where-Object { $_.kind -eq "tool" }).Count "Active Tool Default catalog count"
+    $toolIds = @($catalog.defaults | Where-Object { $_.kind -eq "tool" } | ForEach-Object { [string]$_.id } | Sort-Object)
+    Assert-Equal 6 $toolIds.Count "Active Tool Default catalog count"
+    Assert-Equal "ci-test,config,file-io,generated-integrity,logging,pwa" ($toolIds -join ",") "Active Tool Default catalog IDs"
     foreach ($profileFile in Get-ChildItem (Join-Path $RepoRoot ".kinotch/profiles") -File) {
         $profile = Get-Content -Raw -Encoding UTF8 $profileFile.FullName | ConvertFrom-Json
-        Assert-Equal "planned" $profile.status "$($profileFile.Name) profile status"
+        Assert-True (-not $profile.PSObject.Properties["status"]) "$($profileFile.Name) has stale profile lifecycle metadata"
     }
 }
 

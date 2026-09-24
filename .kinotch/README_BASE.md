@@ -1,6 +1,6 @@
 # KiNoTch. Repository Base — Common README
 
-Base version: `0.3.9`
+Base version: `0.5.0`
 
 この文書はKiNoTch.標準リポジトリの共通取扱説明書である。個別READMEへ同じ説明を複製しない。
 
@@ -14,6 +14,8 @@ KiNoTch.Runtime = 複数repoで再利用する共通実装。個別repoへコピ
 ```
 
 Base-wide Metaは `.kinotch/meta/` に置き、新規Repository用の生成元は `.kinotch/templates/project/` に置く。Base自身のProject情報は `project/**` に記録し、Templateと混同しない。
+
+Base v0.5.0はPhase 5のSurface Default Kit機能releaseである。CLI、Windows、MCP、API、AgentのSurface Kitと、ci-test、generated-integrity、file-io、pwa、config、loggingのTool Defaultは、Domain非依存で安全に外せる補助境界を提供する。既存FrameworkやProject実装はOVERRIDEとして維持でき、Runtime semanticsは変更しない。通常の運用方針は [Phase 5 Operations](meta/07_PHASE5_OPERATIONS.md) を参照する。
 
 ## Default-first
 
@@ -58,6 +60,7 @@ PowerShell:
 - Default CatalogがSchemaとsemantic規則に適合し、Default stateが `DEFAULT` / `OVERRIDE` / `DISABLED` のいずれかであるか
 - `DEFAULT` ToolがManifestの有効Surfaceと互換するか
 - `DEFAULT` SurfaceがManifestで有効化されているか
+- template-backed Defaultのmaterialized fileが存在し、provenance hashから変更されていないか
 - Manifestなしの `migrate` ではpackage / Cargo / Python / workflow / web asset形状から候補をdry-run診断する
 - 定義済み共通コマンド
 
@@ -67,7 +70,7 @@ PowerShell:
 
 ## init / migrate
 
-`knt init --profile <surface>` は `minimal`、`web-app`、`cli`、`windows-gui`（`windows` alias）、`mcp`、`api`、`agent`、`library` を複数選択し、TemplateからProject Overlayを生成する。`--default <tool-default>` で `ci-test`、`generated-integrity`、`file-io`、`pwa` の実装済みTool Defaultを選択できる。`knt verify` 自体はL1 Hard Baseの常設コマンドであり、Tool Default stateで無効化・生成する対象ではない。`cli` はJSON/error/exit/help helper、`windows` はExplorer/clipboard境界、`mcp` はtool naming/input/diagnostic境界、`api` はHTTP statusやcode体系を固定しないerror envelope schemaを生成する。`ci-test` はBase自身のworkflowとは別の非Deploy workflowを生成し、doctor → setup → verifyを実行する。`pwa` は相対base pathで動くmanifest / service worker / registration helper / check、`generated-integrity` はProject root内のsourceとartifact双方のSHA-256 metadata / stale check / update helper、`file-io` はUTF-8 text専用helperと形式非依存のProject callback境界を生成する。選択ProfileはSurface宣言と安全な補助だけを生成し、`runtime.modules` は空のまま保持する。既存の `project/project.json` または既存Projectファイルは上書きしない。
+`knt init --profile <surface>` は `minimal`、`web-app`、`cli`、`windows-gui`（`windows` alias）、`mcp`、`api`、`agent`、`library` を複数選択し、TemplateからProject Overlayを生成する。`--default <tool-default>` で `ci-test`、`generated-integrity`、`file-io`、`pwa`、`config`、`logging` の実装済みTool Defaultを選択できる。`knt verify` 自体はL1 Hard Baseの常設コマンドであり、Tool Default stateで無効化・生成する対象ではない。`cli` Surface Kitは共通option解析、JSON/result/error/stdout/stderr/exit helper、`windows` Surface Kitはpath/drop、lazy native picker/save、progress/cancel、Explorer/clipboard境界、`mcp` Surface Kitはtool naming/input/path/diagnostic/error/capability helperとhost-owned dispatch、`api` Surface Kitはrequest/correlation context、health、permissive error envelope、差し替え可能hook、`agent` Surface Kitはinvocation context、diagnostic、capability、boundary hookを生成する。これらはHTTP policy、Framework dispatch、Domain処理、公開error taxonomy、planner、memoryを固定しない。`ci-test` はBase自身のworkflowとは別の非Deploy workflowを生成し、doctor → setup → verifyをUbuntu PowerShell、Windows PowerShell Core、Windows PowerShell 5.1で実行する。`pwa` は相対base pathで動くmanifest / service worker / registration helper / check、`generated-integrity` はProject root内のsourceとartifact双方のSHA-256 metadata / stale check / update helper、`file-io` はUTF-8 text専用helperと形式非依存のProject callback境界、`config` はcaller-provided mapのmergeと明示secret keyのredaction、`logging` はUTC recordとstderr / sink boundaryを生成する。選択ProfileはSurface宣言と安全な補助だけを生成し、`runtime.modules` は空のまま保持する。既存の `project/project.json` または既存Projectファイルは上書きしない。
 
 `knt migrate` は既存ProjectのSurface / Tool Default候補を表示するだけで、既定ではファイルを変更しない。Project Manifestがない場合も、`-BaseOverride` を指定したBase routerからrepository shapeをread-only検出できる。`-BaseOverride` はshape probe専用であり、`init`、`migrate --apply`、Default materialization、Base mutationには使用できない。書込みには対象Repository自身の有効な `.kinotch/` とProject Manifestが必要である。Manifestで無効なSurfaceを `migrate --apply --profile` で自動有効化することはない。`--apply` を明示した場合だけ `project/defaults.json` と必要なManifest pathを更新し、DEFAULT状態の安全な補助ファイルを不足分だけ生成する。Default実装は全ファイルを事前検査し、1件でも衝突があればそのDefaultから何も生成せず `OVERRIDE` として記録する。既存の `OVERRIDE` / `DISABLED` 状態は保持し、同じ内容の既存ファイルはDEFAULTのまま、異なる内容の既存ファイルはOVERRIDEとして記録する。Domain fileは変更しない。
 

@@ -1,6 +1,64 @@
 [CmdletBinding()]
 param()
 
+function Get-CliCommonOptions {
+    param([string[]]$Arguments = @())
+
+    $remaining = New-Object System.Collections.Generic.List[string]
+    $options = [ordered]@{
+        Help = $false
+        Version = $false
+        Json = $false
+        Quiet = $false
+        Verbose = $false
+        DryRun = $false
+        Yes = $false
+        RemainingArgs = @()
+    }
+    $afterTerminator = $false
+    foreach ($argument in @($Arguments)) {
+        if ($afterTerminator) {
+            [void]$remaining.Add([string]$argument)
+            continue
+        }
+        switch ([string]$argument) {
+            "--" { $afterTerminator = $true; [void]$remaining.Add("--"); continue }
+            "--help" { $options.Help = $true; continue }
+            "--version" { $options.Version = $true; continue }
+            "--json" { $options.Json = $true; continue }
+            "--quiet" { $options.Quiet = $true; continue }
+            "--verbose" { $options.Verbose = $true; continue }
+            "--dry-run" { $options.DryRun = $true; continue }
+            "--yes" { $options.Yes = $true; continue }
+            default { [void]$remaining.Add([string]$argument) }
+        }
+    }
+    $options.RemainingArgs = @($remaining.ToArray())
+    return [pscustomobject]$options
+}
+
+function Write-CliOutput {
+    param(
+        [Parameter(Mandatory=$true)][AllowEmptyString()][string]$Message,
+        [switch]$Quiet
+    )
+
+    if (-not $Quiet) {
+        [Console]::Out.WriteLine($Message)
+    }
+}
+
+function Write-CliDiagnostic {
+    param(
+        [Parameter(Mandatory=$true)][AllowEmptyString()][string]$Message,
+        [switch]$VerboseOutput
+    )
+
+    if ($VerboseOutput) {
+        [Console]::Error.WriteLine($Message)
+    }
+}
+
 function Write-CliJson {
     param(
         [Parameter(Mandatory=$true)]$Value,
@@ -23,6 +81,19 @@ function Write-CliError {
         details = $Details
     }
     [Console]::Error.WriteLine((ConvertTo-Json $envelope -Depth 20 -Compress))
+}
+
+function Write-CliResult {
+    param(
+        [Parameter(Mandatory=$true)]$Value,
+        [switch]$Json
+    )
+
+    if ($Json) {
+        Write-CliJson -Value $Value
+        return
+    }
+    [Console]::Out.WriteLine([string]$Value)
 }
 
 function Exit-Cli {

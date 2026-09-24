@@ -16,7 +16,6 @@
       "type": "string"
     },
     "details": {
-      "type": "object"
     },
     "requestId": {
       "type": "string",

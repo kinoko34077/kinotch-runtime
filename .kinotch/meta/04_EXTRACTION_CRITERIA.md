@@ -1,101 +1,86 @@
 # 04 — Extraction Criteria
 
-個別repo内の仕組みをBase / Runtimeへ昇格させる際の判断基準。
+個別repo内の仕組みを、Hard Base、Default、Portable Contract / Runtime、
+Project、Domain Libraryのどこへ置くかを決める基準。
 
-## A. Baseへ昇格するもの
-
-Baseは「配置・規則・操作入口・契約」を担当する。
-
-次を満たす場合に候補とする。
-
-1. 複数repoで同じ開発上の意味を持つ。
-2. 技術スタックに依存しない、またはprofile差で吸収できる。
-3. 個別repoごとに変える合理的理由が少ない。
-4. Agentが共通で知る価値が高い。
-5. 配置や命名を固定すると探索量が明確に減る。
-
-例:
-
-- AGENTSの入口
-- `project/docs/INDEX.md`
-- Current Stateの位置
-- `knt test/verify/doctor`という操作語彙
-- Action / Error等のSchema
-- generated artifactは手編集禁止という規則
-
-## B. Runtimeへ昇格するもの
-
-Runtimeは「複数repoから実際に再利用する実装」を担当する。
-
-次を満たす場合に候補とする。
-
-1. 異なるrepoで実装が重複している。
-2. Domain固有意味を含まない。
-3. 入出力Contractを安定して定義できる。
-4. 共通化によって条件分岐・dependency・設定量が増えすぎない。
-5. 独立テスト可能。
-6. Optional moduleとして切り離せる。
-
-例:
-
-- ProgressEvent
-- Cancellation
-- File / Folder resource abstraction
-- CLI JSON formatter
-- Windows File Dialog adapter
-- MCP Action mapper
-- generated stale checker
-
-## C. Projectに残すもの
-
-次は原則Projectに残す。
-
-- Domain Core
-- 個別UIレイアウト
-- 特殊な性能最適化
-- repo固有の互換処理
-- 特殊なdeploy policy
-- 一度しか現れていない仕組み
-- 変更理由が他repoと異なるもの
-
-## D. Domain Libraryとして分離するもの
-
-複数repoで再利用するが、Runtime一般機能ではない場合。
-
-例:
+## 判断順
 
 ```text
-kinotch-text
-kinotch-music
-kinotch-image
+候補 X
+  ↓
+Repository運用そのものに必須か？
+  ├─ Yes → L1 Hard Base
+  └─ No
+       ↓
+Domain意味を持たず、安全に外せて、毎回の実装を減らすか？
+  ├─ Yes → L2 Default
+  └─ No
+       ↓
+異なる実装で同じ意味・責任・変更理由を共有する必要があるか？
+  ├─ Yes → L3 Portable Contract / Runtime候補
+  └─ No → L4 Project / Domain Library
 ```
 
-Runtimeへ押し込まず、独立したDomain Libraryを検討する。
+## A. L1 Hard Base
 
-## 判断手順
+Repositoryの配置・規則・操作入口・検証を所有する。
 
-```text
-個別repoで重複を発見
-↓
-同じ知識 / 同じ変更理由か？
-├─ No → Projectに残す
-└─ Yes
-   ↓
-配置・規則・契約か？
-├─ Yes → Base候補
-└─ No
-   ↓
-実装を複数repoで再利用するか？
-├─ Yes → Runtime候補
-└─ No → Projectに残す
-```
+- `AGENTS.md`、`.kinotch/`、`project/`境界
+- Project Manifest、Profile、Surface宣言、Schema
+- `knt setup/test/build/verify/smoke/doctor`語彙
+- doctor、verify、base-check、base-refresh
+- Base保護、Default Catalog、init / migrateの安全境界
 
-## 昇格時の原則
+Project固有情報、Domain処理、公開API policy、永続形式は入れない。
 
-個別実装を即削除しない。
+## B. L2 Default
 
-1. 共通版を作る。
-2. 代表repoで置換する。
-3. 既存テスト / smokeで同等性を確認する。
-4. 共通化による複雑化がないか確認する。
-5. 問題なければ他repoへ適用する。
+低リスクで安全に外せる共通実装。`DEFAULT`、`OVERRIDE`、`DISABLED`だけで
+Project単位の採用状態を表す。
+
+現行Surface Kit候補:
+
+- CLIの共通option、JSON / stderr / exit補助
+- Windowsのpicker、Save、D&D、Progress、Cancel、Explorer / Clipboard境界
+- MCPのtool name、input validator、Project path、diagnostic、capability補助
+- APIのrequest context、health、permissive envelope、replaceable hook
+- Agentのinvocation context、diagnostic、capability、boundary hook
+
+現行Tool Default:
+
+- `ci-test`
+- `generated-integrity`
+- `file-io`
+- `pwa`
+- `config`
+- `logging`
+
+Defaultは既存Frameworkを置き換えず、Domain format、公開error taxonomy、
+deploy、auth方式、authority、永続状態、Runtime moduleを所有しない。
+
+## C. L3 Portable Contract / Runtime
+
+複数repo・異種実装で同じ実行意味を共有する必要があり、変換層より削減効果が
+大きい場合だけ候補にする。Pilotや成熟度評価はここに限る。
+
+例: operation identity、input、request/correlation identity、error semantics、
+narrow progress / artifact reference。PythonのActionRegistry、例外型、
+PowerShellのSurface helper、Hono / Rust固有のdispatcherはPortable Contract
+ではない。
+
+## D. L4 Project / Domain Library
+
+- Domain Core、データモデル、UI状態機械、永続形式
+- provider / deploy / auth / retry policy
+- resource authority、AgentBackend、planner、memory
+- 一度しか現れない処理、変更理由が他repoと異なる処理
+
+複数repoで再利用するがRuntime一般機能でないものは、`kinotch-text`等の
+独立Domain Libraryを検討し、Runtimeへ押し込まない。
+
+## 昇格時の安全策
+
+個別実装を即削除しない。共通版を作り、既存Frameworkを`OVERRIDE`として
+保持したまま、対象repoの既存test / smokeで同等性を確認する。Defaultが
+意味・設定・依存を増やすだけなら採用せず、Portable Contract候補がDomain差を
+吸収できないならProjectまたはDefaultへ戻す。

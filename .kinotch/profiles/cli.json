@@ -1,6 +1,5 @@
 {
   "profile": "cli",
-  "status": "planned",
   "description": "CLIツール。",
   "surfaces": {
     "cli": true
