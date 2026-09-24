@@ -65,7 +65,8 @@ function Assert-RepositoryWriteAllowed([string]$Operation) {
 
     $localResolved = (Resolve-Path -LiteralPath $localBaseDir).Path
     $activeResolved = (Resolve-Path -LiteralPath $BaseDir).Path
-    if (-not [string]::Equals($localResolved, $activeResolved, [System.StringComparison]::OrdinalIgnoreCase)) {
+    $pathComparison = Get-KntPathComparison -Windows ($env:OS -eq "Windows_NT")
+    if (-not [string]::Equals($localResolved, $activeResolved, $pathComparison)) {
         throw "$Operation requires the repository-local .kinotch/ Base"
     }
 }
@@ -100,7 +101,7 @@ function Resolve-KntContainedPath {
     if (-not $contained) {
         throw "$Description escapes its root boundary: $RelativePath"
     }
-    return $candidatePath
+    return Assert-KntSafePath -Root $basePath -Candidate $candidatePath -Description $Description -AllowRoot:$AllowRoot
 }
 
 function Resolve-KntManifestProjectPath {
@@ -595,7 +596,8 @@ function Get-MigrateRecommendedState($Entry, $Shape) {
 
 function Write-KntJsonFile([string]$Path, $Value) {
     $json = ConvertTo-Json $Value -Depth 20
-    [IO.File]::WriteAllText($Path, $json + [Environment]::NewLine, (New-Object System.Text.UTF8Encoding($false)))
+    $safePath = Assert-KntSafeWritePath -Root $Root -Candidate $Path -Description "JSON output"
+    [IO.File]::WriteAllText($safePath, $json + [Environment]::NewLine, (New-Object System.Text.UTF8Encoding($false)))
 }
 
 function Get-KntBaseVersion {
@@ -604,7 +606,7 @@ function Get-KntBaseVersion {
 
 function Get-DefaultMaterializedFileMetadata($Plan) {
     $metadata = New-Object System.Collections.Generic.List[object]
-    foreach ($item in @($Plan | Where-Object { $null -ne $_ })) {
+    foreach ($item in @($Plan | Where-Object { $null -ne $_ -and $null -ne $_.template })) {
         if (-not (Test-Path -LiteralPath $item.destination -PathType Leaf)) { continue }
         [void]$metadata.Add([pscustomobject]@{
             path = (ConvertTo-BaseRelativePath -Root $Root -AbsolutePath $item.destination)
@@ -615,7 +617,7 @@ function Get-DefaultMaterializedFileMetadata($Plan) {
 }
 
 function Set-DefaultProvenance($PackEntry, $Plan) {
-    $planItems = @($Plan | Where-Object { $null -ne $_ })
+    $planItems = @($Plan | Where-Object { $null -ne $_ -and $null -ne $_.template })
     if ($planItems.Count -eq 0) { return $false }
     $metadata = @(Get-DefaultMaterializedFileMetadata -Plan $planItems)
     if ($metadata.Count -ne $planItems.Count) { return $false }
@@ -626,20 +628,66 @@ function Set-DefaultProvenance($PackEntry, $Plan) {
     return ($before -ne $after)
 }
 
-function Finalize-DefaultImplementation([string]$DefaultId, $Manifest, [string]$ProjectRoot) {
-    if ($DefaultId -ne "pwa") { return }
-    $pwaManifestPath = Join-Path $ProjectRoot "public/manifest.webmanifest"
-    if (-not (Test-Path -LiteralPath $pwaManifestPath -PathType Leaf)) { return }
-    $pwaManifest = Get-KntJson -Path $pwaManifestPath
-    $projectName = [string]$Manifest.project.name
-    if ([string]::IsNullOrWhiteSpace($projectName)) { $projectName = "KiNoTch. Project" }
-    $pwaManifest.name = $projectName
-    $pwaManifest.short_name = $projectName
-    if ([string]::IsNullOrWhiteSpace([string]$pwaManifest.start_url) -or [string]$pwaManifest.start_url -match '^[\\/]|^[a-zA-Z][a-zA-Z0-9+.-]*:') {
-        $pwaManifest.start_url = "."
+function Clear-DefaultProvenance($PackEntry) {
+    $changed = $false
+    foreach ($propertyName in @("source_base_version", "materialized_files")) {
+        if ($PackEntry.PSObject.Properties[$propertyName]) {
+            $PackEntry.PSObject.Properties.Remove($propertyName)
+            $changed = $true
+        }
     }
-    if ([string]::IsNullOrWhiteSpace([string]$pwaManifest.display)) { $pwaManifest.display = "standalone" }
-    Write-KntJsonFile -Path $pwaManifestPath -Value $pwaManifest
+    return $changed
+}
+
+function Finalize-DefaultImplementation([string]$DefaultId, $Manifest, [string]$ProjectRoot) {
+    if ($DefaultId -eq "pwa") {
+        $pwaManifestPath = Join-Path $ProjectRoot "public/manifest.webmanifest"
+        if (-not (Test-Path -LiteralPath $pwaManifestPath -PathType Leaf)) { return }
+        $pwaManifest = Get-KntJson -Path $pwaManifestPath
+        $projectName = [string]$Manifest.project.name
+        if ([string]::IsNullOrWhiteSpace($projectName)) { $projectName = "KiNoTch. Project" }
+        $pwaManifest.name = $projectName
+        $pwaManifest.short_name = $projectName
+        if ([string]::IsNullOrWhiteSpace([string]$pwaManifest.start_url) -or [string]$pwaManifest.start_url -match '^[\\/]|^[a-zA-Z][a-zA-Z0-9+.-]*:') {
+            $pwaManifest.start_url = "."
+        }
+        if ([string]::IsNullOrWhiteSpace([string]$pwaManifest.display)) { $pwaManifest.display = "standalone" }
+        Write-KntJsonFile -Path $pwaManifestPath -Value $pwaManifest
+        return
+    }
+    if ($DefaultId -eq "ci-test") {
+        $workflowPath = Join-Path $Root ".github/workflows/kinotch-default.yml"
+        if (-not (Test-Path -LiteralPath $workflowPath -PathType Leaf)) { return }
+        $runner = if ([bool](Get-KntJsonProperty $Manifest.surfaces "gui_windows")) { "windows-latest" } else { "ubuntu-latest" }
+        $workflow = @"
+name: KiNoTch Default Verify
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: $runner
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Base / project diagnostics
+        run: ./.kinotch/scripts/knt.ps1 doctor
+      - name: Project setup
+        run: ./.kinotch/scripts/knt.ps1 setup
+      - name: Project verification
+        run: ./.kinotch/scripts/knt.ps1 verify
+"@
+        $safeWorkflowPath = Assert-KntSafeWritePath -Root $Root -Candidate $workflowPath -Description "ci-test workflow"
+        [IO.File]::WriteAllText($safeWorkflowPath, $workflow.TrimStart(), (New-Object System.Text.UTF8Encoding($false)))
+    }
 }
 
 function Get-DefaultImplementationPlan([string]$DefaultId, [string]$ProjectRoot, [string]$Kind = "Tool", $ExistingState = $null) {
@@ -654,6 +702,7 @@ function Get-DefaultImplementationPlan([string]$DefaultId, [string]$ProjectRoot,
         }
     }
     $plan = New-Object System.Collections.Generic.List[object]
+    $templateRepositoryPaths = New-Object System.Collections.Generic.HashSet[string]
     foreach ($templateFile in @(Get-ChildItem -LiteralPath $templateRoot -Recurse -File -Force | Sort-Object FullName)) {
         $relative = ConvertTo-BaseRelativePath -Root $templateRoot -AbsolutePath $templateFile.FullName
         if ($relative -like ".github/*") {
@@ -663,6 +712,7 @@ function Get-DefaultImplementationPlan([string]$DefaultId, [string]$ProjectRoot,
             $destination = Join-Path $ProjectRoot $relative
         }
         $repositoryRelative = ConvertTo-BaseRelativePath -Root $Root -AbsolutePath $destination
+        [void]$templateRepositoryPaths.Add($repositoryRelative)
         $status = "MISSING"
         if (Test-Path -LiteralPath $destination) {
             $currentHash = $null
@@ -696,6 +746,75 @@ function Get-DefaultImplementationPlan([string]$DefaultId, [string]$ProjectRoot,
             template = $templateFile.FullName
             destination = $destination
             status = $status
+            action = "copy"
+        })
+    }
+    foreach ($recordedPath in @($recordedHashes.Keys)) {
+        if ($templateRepositoryPaths.Contains($recordedPath)) { continue }
+        try {
+            $destination = Resolve-KntContainedPath -BaseRoot $Root -RelativePath $recordedPath -Description "Default '$DefaultId' recorded path" -AllowRoot
+        }
+        catch {
+            [void]$plan.Add([pscustomobject]@{
+                default_id = $DefaultId
+                kind = $Kind
+                relative = $recordedPath
+                repository_relative = $recordedPath
+                template = $null
+                destination = $null
+                status = "CONFLICT"
+                action = "remove"
+            })
+            continue
+        }
+        $currentHash = if (Test-Path -LiteralPath $destination -PathType Leaf) { Get-BaseFileHash -Path $destination } else { $null }
+        $status = if ($null -eq $currentHash -or $currentHash -eq $recordedHashes[$recordedPath]) { "STALE_UNCHANGED" } else { "CONFLICT" }
+        [void]$plan.Add([pscustomobject]@{
+            default_id = $DefaultId
+            kind = $Kind
+            relative = $recordedPath
+            repository_relative = $recordedPath
+            template = $null
+            destination = $destination
+            status = $status
+            action = "remove"
+        })
+    }
+    return @($plan.ToArray())
+}
+
+function Get-DefaultRemovalPlan([string]$DefaultId, $ExistingState, [string]$Kind = "Tool") {
+    $plan = New-Object System.Collections.Generic.List[object]
+    if (-not $ExistingState -or -not $ExistingState.PSObject.Properties["materialized_files"]) { return @() }
+    foreach ($recorded in @($ExistingState.materialized_files)) {
+        $recordedPath = [string]$recorded.path
+        try {
+            $destination = Resolve-KntContainedPath -BaseRoot $Root -RelativePath $recordedPath -Description "Default '$DefaultId' recorded path" -AllowRoot
+        }
+        catch {
+            [void]$plan.Add([pscustomobject]@{
+                default_id = $DefaultId
+                kind = $Kind
+                relative = $recordedPath
+                repository_relative = $recordedPath
+                template = $null
+                destination = $null
+                status = "CONFLICT"
+                action = "remove"
+            })
+            continue
+        }
+        $currentHash = if (Test-Path -LiteralPath $destination -PathType Leaf) { Get-BaseFileHash -Path $destination } else { $null }
+        $status = if ($null -eq $currentHash -or $currentHash -eq [string]$recorded.sha256) { "STALE_UNCHANGED" } else { "CONFLICT" }
+        [void]$plan.Add([pscustomobject]@{
+            default_id = $DefaultId
+            kind = $Kind
+            relative = $recordedPath
+            repository_relative = $recordedPath
+            template = $null
+            destination = $destination
+            status = $status
+            action = "remove"
         })
     }
     return @($plan.ToArray())
@@ -717,14 +836,23 @@ function Apply-DefaultImplementationPlan($Plan, [System.Collections.Generic.List
         return
     }
     foreach ($item in $planItems) {
+        if ([string]$item.action -eq "remove") {
+            if ([string]$item.status -eq "STALE_UNCHANGED" -and $item.destination -and (Test-Path -LiteralPath $item.destination -PathType Leaf)) {
+                $safeDestination = Assert-KntSafeWritePath -Root $Root -Candidate $item.destination -Description "Default '$defaultId' cleanup"
+                Remove-Item -LiteralPath $safeDestination -Force
+                Write-Knt "$kind Default '$defaultId' removed stale path: $($item.relative)"
+            }
+            continue
+        }
         if ([string]$item.status -eq "IDENTICAL") {
             Write-Knt "$kind Default '$defaultId' preserved identical path: $($item.relative)"
             continue
         }
-        $parent = Split-Path -Parent $item.destination
+        $safeDestination = Assert-KntSafeWritePath -Root $Root -Candidate $item.destination -Description "Default '$defaultId' materialization"
+        $parent = Split-Path -Parent $safeDestination
         New-Item -ItemType Directory -Path $parent -Force | Out-Null
-        Copy-Item -LiteralPath $item.template -Destination $item.destination -Force
-        Write-Knt "$kind Default '$defaultId' added: $($item.relative)"
+        Copy-Item -LiteralPath $item.template -Destination $safeDestination -Force
+        Write-Knt "$kind Default '$defaultId' materialized: $($item.relative)"
     }
     return [pscustomobject]@{ default_id = $defaultId; conflict = $false }
 }
@@ -740,7 +868,7 @@ function Invoke-GeneratedDefaultScript([string]$ScriptRelativePath, [string]$Com
     if ([string]::IsNullOrWhiteSpace($powerShell)) {
         $powerShell = (Get-Command powershell -ErrorAction Stop | Select-Object -First 1).Source
     }
-    & $powerShell -NoProfile -ExecutionPolicy Bypass -File $scriptPath -Root $projectRoot
+    & $powerShell -NoProfile -ExecutionPolicy Bypass -File $scriptPath
     if ($null -ne $LASTEXITCODE) { return $LASTEXITCODE }
     return 0
 }
@@ -779,7 +907,8 @@ function Invoke-Init {
     if (-not (Test-Path -LiteralPath $templateRoot -PathType Container)) {
         throw "Project template not found: $templateRoot"
     }
-    New-Item -ItemType Directory -Path $projectRoot -Force | Out-Null
+    $safeProjectRoot = Assert-KntSafeWritePath -Root $Root -Candidate $projectRoot -Description "Project materialization" -AllowRoot
+    New-Item -ItemType Directory -Path $safeProjectRoot -Force | Out-Null
 
     foreach ($templateEntry in @(Get-ChildItem -LiteralPath $templateRoot -Force)) {
         if ($templateEntry.Name -eq "README.md") {
@@ -796,7 +925,8 @@ function Invoke-Init {
             if ($templateEntry.Name -eq "README.md") { continue }
             throw "Refusing to overwrite existing generated path: $destination"
         }
-        Copy-Item -LiteralPath $templateEntry.FullName -Destination $destination -Recurse -Force
+        $safeDestination = Assert-KntSafeWritePath -Root $Root -Candidate $destination -Description "Project template materialization"
+        Copy-Item -LiteralPath $templateEntry.FullName -Destination $safeDestination -Recurse -Force
     }
 
     $manifest = Get-KntJson -Path $ManifestPath
@@ -886,10 +1016,6 @@ function Invoke-Migrate($Manifest) {
         if ($compatibilityError) { throw $compatibilityError }
     }
     $selectedEntries = @($profileEntries + $toolEntries)
-    if ($selectedEntries.Count -eq 0) {
-        Write-Knt "No Default candidates detected. Use --profile <surface> or --default <tool-default>."
-        return 0
-    }
 
     $projectRoot = Join-Path $Root "project"
     $defaultsRelative = Get-ManifestPathValue $Manifest "defaults" "defaults.json"
@@ -920,6 +1046,18 @@ function Invoke-Migrate($Manifest) {
     $changedDefaults = $false
     $conflictingDefaults = New-Object System.Collections.Generic.List[string]
     $materializationPlans = @{}
+    $disabledEntries = New-Object System.Collections.Generic.List[object]
+    $selectedIds = @($selectedEntries | ForEach-Object { [string]$_.id })
+    foreach ($packProperty in @($defaults.packs.PSObject.Properties)) {
+        $packState = [string](Get-KntJsonProperty $packProperty.Value "state")
+        if ($packState -ne "DISABLED" -or [string]$packProperty.Name -in $selectedIds) { continue }
+        $disabledEntry = Find-AnyDefaultCatalogEntry -Catalog $catalog -Identifier ([string]$packProperty.Name)
+        [void]$disabledEntries.Add([pscustomobject]@{ entry = $disabledEntry; property = $packProperty })
+    }
+    if ($selectedEntries.Count -eq 0 -and $disabledEntries.Count -eq 0) {
+        Write-Knt "No Default candidates detected. Use --profile <surface> or --default <tool-default>."
+        return 0
+    }
     foreach ($entry in $selectedEntries) {
         $packName = [string]$entry.id
         $packProperty = $defaults.packs.PSObject.Properties[$packName]
@@ -934,6 +1072,26 @@ function Invoke-Migrate($Manifest) {
             if ($options.apply) {
                 $defaults.packs | Add-Member -NotePropertyName $packName -NotePropertyValue ([pscustomobject]@{ state = $state }) -Force
                 $changedDefaults = $true
+            }
+        }
+    }
+
+    $disabledPlans = @{}
+    foreach ($disabled in @($disabledEntries.ToArray())) {
+        $defaultId = [string]$disabled.entry.id
+        $plan = @(Get-DefaultRemovalPlan -DefaultId $defaultId -ExistingState $disabled.property.Value -Kind $(if ([string]$disabled.entry.kind -eq "surface") { "Surface" } else { "Tool" }))
+        $disabledPlans[$defaultId] = $plan
+        if ($plan.Count -eq 0) {
+            Write-Knt "$(if ([string]$disabled.entry.kind -eq 'surface') { 'Surface' } else { 'Tool' }) Default '$defaultId' is DISABLED with no tracked materialized files"
+            continue
+        }
+        foreach ($item in $plan) {
+            if ([string]$item.status -eq "STALE_UNCHANGED") {
+                $actionText = if ($item.destination -and (Test-Path -LiteralPath $item.destination -PathType Leaf)) { "scheduled for removal" } else { "already absent" }
+                Write-Knt "$(if ([string]$disabled.entry.kind -eq 'surface') { 'Surface' } else { 'Tool' }) Default '$defaultId' is DISABLED; ${actionText}: $($item.relative)"
+            }
+            else {
+                Write-Knt "$(if ([string]$disabled.entry.kind -eq 'surface') { 'Surface' } else { 'Tool' }) Default '$defaultId' has a modified materialized file: $($item.relative); preserve it or mark OVERRIDE"
             }
         }
     }
@@ -956,6 +1114,23 @@ function Invoke-Migrate($Manifest) {
             $kind = if ([string]$entry.kind -eq "surface") { "Surface" } else { "Tool" }
             $materializationPlans[[string]$entry.id] = @(Get-DefaultImplementationPlan -DefaultId ([string]$entry.id) -ProjectRoot $projectRoot -Kind $kind -ExistingState $packProperty.Value)
             [void](Apply-DefaultImplementationPlan -Plan $materializationPlans[[string]$entry.id] -ConflictingDefaults $conflictingDefaults)
+        }
+    }
+
+    foreach ($disabled in @($disabledEntries.ToArray())) {
+        $defaultId = [string]$disabled.entry.id
+        $plan = @($disabledPlans[$defaultId])
+        $conflicts = @($plan | Where-Object { [string]$_.status -eq "CONFLICT" })
+        if ($conflicts.Count -gt 0) {
+            Write-Knt "$(if ([string]$disabled.entry.kind -eq 'surface') { 'Surface' } else { 'Tool' }) Default '$defaultId' DISABLED cleanup skipped because a materialized file was modified"
+            continue
+        }
+        [void](Apply-DefaultImplementationPlan -Plan $plan -ConflictingDefaults $null)
+        if (Clear-DefaultProvenance -PackEntry $disabled.property.Value) {
+            $changedDefaults = $true
+        }
+        if (@($plan | Where-Object { [string]$_.status -eq "STALE_UNCHANGED" -and $_.destination -and (Test-Path -LiteralPath $_.destination -PathType Leaf) }).Count -gt 0) {
+            $changedDefaults = $true
         }
     }
     foreach ($conflictingDefault in @($conflictingDefaults | Select-Object -Unique)) {
@@ -1154,6 +1329,19 @@ function Test-SelectedDefaultImplementations($DefaultsData) {
     foreach ($packProperty in @($DefaultsData.packs.PSObject.Properties)) {
         $defaultId = [string]$packProperty.Name
         $state = [string](Get-KntJsonProperty $packProperty.Value "state")
+        if ($state -eq "DISABLED") {
+            $disabledPlan = @(Get-DefaultRemovalPlan -DefaultId $defaultId -ExistingState $packProperty.Value -Kind "Default")
+            foreach ($item in $disabledPlan) {
+                if ([string]$item.status -eq "CONFLICT") {
+                    Write-Host "[doctor] DISABLED Default implementation remains modified: $($item.repository_relative); mark the pack OVERRIDE or delete the file explicitly" -ForegroundColor Red
+                    $ok = $false
+                }
+                elseif ([string]$item.status -eq "STALE_UNCHANGED" -and $item.destination -and (Test-Path -LiteralPath $item.destination -PathType Leaf)) {
+                    Write-Host "[doctor] WARNING DISABLED Default '$defaultId' still has a materialized file: $($item.repository_relative); run knt migrate --apply to remove it" -ForegroundColor Yellow
+                }
+            }
+            continue
+        }
         if ($state -ne "DEFAULT") { continue }
 
         $templateRoot = Join-Path $BaseDir ("templates/defaults/" + $defaultId)
@@ -1164,6 +1352,7 @@ function Test-SelectedDefaultImplementations($DefaultsData) {
 
         $plan = @(Get-DefaultImplementationPlan -DefaultId $defaultId -ProjectRoot $projectRoot -Kind "Default" -ExistingState $packProperty.Value)
         foreach ($item in $plan) {
+            if ($null -eq $item.template) { continue }
             if (-not (Test-Path -LiteralPath $item.destination -PathType Leaf)) {
                 Write-Host "[doctor] MISSING implementation for Default '$defaultId': $($item.repository_relative)" -ForegroundColor Red
                 $ok = $false

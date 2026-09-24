@@ -1,11 +1,10 @@
-param(
-    [string]$Root = (Split-Path -Parent $PSScriptRoot)
-)
-
 $ErrorActionPreference = "Stop"
-$manifestPath = Join-Path $Root "public/manifest.webmanifest"
-$workerPath = Join-Path $Root "public/service-worker.js"
-$registrationPath = Join-Path $Root "src/pwa/register.js"
+$repositoryRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot "../.."))
+. (Join-Path $repositoryRoot ".kinotch/scripts/path-containment.ps1")
+$projectRoot = [IO.Path]::GetFullPath((Join-Path $repositoryRoot "project"))
+$manifestPath = Assert-KntSafePath -Root $projectRoot -Candidate (Join-Path $projectRoot "public/manifest.webmanifest") -Description "PWA manifest"
+$workerPath = Assert-KntSafePath -Root $projectRoot -Candidate (Join-Path $projectRoot "public/service-worker.js") -Description "PWA service worker"
+$registrationPath = Assert-KntSafePath -Root $projectRoot -Candidate (Join-Path $projectRoot "src/pwa/register.js") -Description "PWA registration helper"
 $errors = New-Object System.Collections.Generic.List[string]
 
 if (-not (Test-Path -LiteralPath $manifestPath -PathType Leaf)) { [void]$errors.Add("missing public/manifest.webmanifest") }

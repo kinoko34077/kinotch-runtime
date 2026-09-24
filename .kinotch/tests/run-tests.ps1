@@ -11,6 +11,7 @@ if ([string]::IsNullOrWhiteSpace($PowerShellExecutable)) {
 . (Join-Path $RepoRoot ".kinotch/scripts/knt-validation.ps1")
 $Passed = 0
 $Failed = 0
+$Skipped = 0
 
 function Assert-True([bool]$Condition, [string]$Message) {
     if (-not $Condition) { throw $Message }
@@ -110,6 +111,7 @@ function Invoke-KntFixture {
         Remove-Item -LiteralPath (Join-Path $tempRoot "project") -Recurse -Force
         Copy-Item -LiteralPath (Join-Path $FixtureRoot $Name) -Destination (Join-Path $tempRoot "project") -Recurse -Force
         if ($Prepare) { & $Prepare $tempRoot }
+        if ($script:SkipCurrentTest) { return }
         $router = Join-Path $tempRoot ".kinotch/scripts/knt.ps1"
         $invokeArgs = @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $router, "-RootOverride", $tempRoot, $Command) + @($Arguments)
         $outputLines = @(& $PowerShellExecutable @invokeArgs 2>&1)
@@ -144,6 +146,7 @@ function Invoke-KntInitFixture {
             Remove-Item -LiteralPath (Join-Path $tempRoot ".github/workflows/kinotch-default.yml") -Force -ErrorAction SilentlyContinue
         }
         if ($Prepare) { & $Prepare $tempRoot }
+        if ($script:SkipCurrentTest) { return }
         $router = Join-Path $tempRoot ".kinotch/scripts/knt.ps1"
         $invokeArgs = @("-NoProfile", "-ExecutionPolicy", "Bypass", "-File", $router, "-RootOverride", $tempRoot, "init")
         foreach ($profile in $Profiles) { $invokeArgs += @("--profile", $profile) }
@@ -256,10 +259,17 @@ function Invoke-KntExternalBaseFixture {
 }
 
 function Invoke-TestCase([string]$Name, [scriptblock]$Body) {
+    $script:SkipCurrentTest = $false
     try {
         & $Body
-        $script:Passed++
-        Write-Host "[PASS] $Name" -ForegroundColor Green
+        if ($script:SkipCurrentTest) {
+            $script:Skipped++
+            Write-Host "[SKIP] $Name" -ForegroundColor Yellow
+        }
+        else {
+            $script:Passed++
+            Write-Host "[PASS] $Name" -ForegroundColor Green
+        }
     }
     catch {
         $script:Failed++
@@ -531,8 +541,8 @@ Invoke-TestCase "surface Defaults materialize safe CLI, Windows, MCP, and API he
         )) {
             Assert-True (Test-Path -LiteralPath (Join-Path $root $relative) -PathType Leaf) "missing surface Default implementation: $relative"
         }
-        Assert-True ($output -match "Surface Default 'cli' added") "CLI surface Default was not materialized"
-        Assert-True ($output -match "Surface Default 'api' added") "API surface Default was not materialized"
+        Assert-True ($output -match "Surface Default 'cli' materialized") "CLI surface Default was not materialized"
+        Assert-True ($output -match "Surface Default 'api' materialized") "API surface Default was not materialized"
     }
 }
 Invoke-TestCase "CLI Surface Kit preserves Project arguments and separates output streams" {
@@ -627,7 +637,7 @@ Invoke-TestCase "init materializes safe Default implementations" {
         Set-Content -LiteralPath (Join-Path $root "project/source.txt") -Value "source-v1" -NoNewline
         Set-Content -LiteralPath (Join-Path $root "project/generated.txt") -Value "generated-v1" -NoNewline
         $updater = Join-Path $root "project/tools/update-generated-integrity.ps1"
-        @(& $PowerShellExecutable -NoProfile -ExecutionPolicy Bypass -File $updater -Root (Join-Path $root "project") -Source source.txt -Artifact generated.txt -Generator project-owned 2>&1) | Out-Null
+        @(& $PowerShellExecutable -NoProfile -ExecutionPolicy Bypass -File $updater -Source source.txt -Artifact generated.txt -Generator project-owned 2>&1) | Out-Null
         Assert-Equal 0 $LASTEXITCODE "generated-integrity updater exit code"
         $integrityConfig = Get-Content -Raw -Encoding UTF8 (Join-Path $root "project/generated-integrity.json") | ConvertFrom-Json
         Assert-True ($integrityConfig.entries[0].source_sha256 -match "^[0-9a-f]{64}$") "source hash was not recorded"
@@ -648,6 +658,19 @@ Invoke-TestCase "materialized Defaults record final file provenance" {
         $manifestFile = @($pack.materialized_files | Where-Object { $_.path -eq "project/public/manifest.webmanifest" })
         Assert-Equal 1 $manifestFile.Count "PWA manifest provenance entry"
         Assert-True ([string]$manifestFile[0].sha256 -match "^[0-9a-f]{64}$") "PWA provenance hash"
+    }
+}
+Invoke-TestCase "unchanged Default provenance does not remove current files on upgrade" {
+    Invoke-KntInitFixture -Profiles @("web-app") -Defaults @("pwa") -AssertOutput {
+        param($root, $output)
+        $router = Join-Path $root ".kinotch/scripts/knt.ps1"
+        @(& $PowerShellExecutable -NoProfile -ExecutionPolicy Bypass -File $router migrate --apply --default pwa 2>&1) | Out-Null
+        Assert-Equal 0 $LASTEXITCODE "unchanged Default upgrade exit code"
+        Assert-True (Test-Path (Join-Path $root "project/public/manifest.webmanifest")) "unchanged Default upgrade removed the manifest"
+        Assert-True (Test-Path (Join-Path $root "project/public/service-worker.js")) "unchanged Default upgrade removed the service worker"
+        $defaults = Get-Content -Raw -Encoding UTF8 (Join-Path $root "project/defaults.json") | ConvertFrom-Json
+        Assert-Equal "DEFAULT" $defaults.packs.pwa.state "unchanged Default upgrade state"
+        Assert-True (@($defaults.packs.pwa.materialized_files).Count -gt 0) "unchanged Default upgrade lost provenance"
     }
 }
 Invoke-TestCase "doctor rejects a modified provenance-tracked Default" {
@@ -779,16 +802,220 @@ Invoke-TestCase "file and generated-integrity Defaults reject paths outside Proj
         $outsidePath = Join-Path $outsideRoot "outside.txt"
         Set-Content -LiteralPath $outsidePath -Value "outside" -NoNewline
         $updater = Join-Path $projectRoot "tools/update-generated-integrity.ps1"
-        @(& $PowerShellExecutable -NoProfile -ExecutionPolicy Bypass -File $updater -Root $projectRoot -Source "..\outside.txt" -Artifact "generated.txt" -Generator test 2>&1) | Out-Null
+        @(& $PowerShellExecutable -NoProfile -ExecutionPolicy Bypass -File $updater -Root $outsideRoot -Source "source.txt" -Artifact "generated.txt" -Generator test 2>&1) | Out-Null
+        Assert-True ($LASTEXITCODE -ne 0) "generated-integrity accepted a caller-supplied Root"
+        @(& $PowerShellExecutable -NoProfile -ExecutionPolicy Bypass -File $updater -Source "..\outside.txt" -Artifact "generated.txt" -Generator test 2>&1) | Out-Null
         Assert-True ($LASTEXITCODE -ne 0) "generated-integrity updater accepted a parent path"
         $fileIo = Join-Path $projectRoot "tools/file-io.ps1"
-        @(& $PowerShellExecutable -NoProfile -ExecutionPolicy Bypass -File $fileIo -Action save -Path "..\outside.txt" -Content "changed" -Root $projectRoot 2>&1) | Out-Null
+        @(& $PowerShellExecutable -NoProfile -ExecutionPolicy Bypass -File $fileIo -Action save -Path "inside.txt" -Content "changed" -Root $outsideRoot 2>&1) | Out-Null
+        Assert-True ($LASTEXITCODE -ne 0) "file-io accepted a caller-supplied Root"
+        @(& $PowerShellExecutable -NoProfile -ExecutionPolicy Bypass -File $fileIo -Action save -Path "..\outside.txt" -Content "changed" 2>&1) | Out-Null
         Assert-True ($LASTEXITCODE -ne 0) "file-io accepted a parent path"
         $absolutePath = Join-Path $outsideRoot "absolute.txt"
-        @(& $PowerShellExecutable -NoProfile -ExecutionPolicy Bypass -File $fileIo -Action save -Path $absolutePath -Content "changed" -Root $projectRoot 2>&1) | Out-Null
+        @(& $PowerShellExecutable -NoProfile -ExecutionPolicy Bypass -File $fileIo -Action save -Path $absolutePath -Content "changed" 2>&1) | Out-Null
         Assert-True ($LASTEXITCODE -ne 0) "file-io accepted an absolute path"
         Assert-Equal "outside" (Get-Content -Raw -Encoding UTF8 $outsidePath) "outside file was modified"
         Remove-Item -LiteralPath $outsideRoot -Recurse -Force
+    }
+}
+Invoke-TestCase "file-io rejects a symlink destination" {
+    Invoke-KntInitFixture -Profiles @("web-app") -Defaults @("file-io") -AssertOutput {
+        param($root, $output)
+        $projectRoot = Join-Path $root "project"
+        $outside = Join-Path $root "outside-target"
+        New-Item -ItemType Directory -Path $outside -Force | Out-Null
+        $link = Join-Path $projectRoot "link"
+        try {
+            New-Item -ItemType SymbolicLink -Path $link -Target $outside -ErrorAction Stop | Out-Null
+        }
+        catch {
+            $script:SkipCurrentTest = $true
+            Write-Host "[SKIP] symlink creation is unavailable: $($_.Exception.Message)" -ForegroundColor Yellow
+            return
+        }
+        try {
+            $fileIo = Join-Path $projectRoot "tools/file-io.ps1"
+            @(& $PowerShellExecutable -NoProfile -ExecutionPolicy Bypass -File $fileIo -Action save -Path "link/escaped.txt" -Content "blocked" 2>&1) | Out-Null
+            Assert-True ($LASTEXITCODE -ne 0) "file-io crossed a symlink boundary"
+            Assert-True (-not (Test-Path (Join-Path $outside "escaped.txt"))) "file-io wrote through a symlink"
+        }
+        finally {
+            Remove-Item -LiteralPath $link -Force -ErrorAction SilentlyContinue
+        }
+    }
+}
+Invoke-TestCase "generated-integrity rejects a symlink source" {
+    Invoke-KntInitFixture -Profiles @("web-app") -Defaults @("generated-integrity") -AssertOutput {
+        param($root, $output)
+        $projectRoot = Join-Path $root "project"
+        $outside = Join-Path $root "outside-target"
+        New-Item -ItemType Directory -Path $outside -Force | Out-Null
+        Set-Content -LiteralPath (Join-Path $outside "source.txt") -Value "outside" -NoNewline
+        Set-Content -LiteralPath (Join-Path $projectRoot "generated.txt") -Value "artifact" -NoNewline
+        $link = Join-Path $projectRoot "link"
+        try {
+            New-Item -ItemType SymbolicLink -Path $link -Target $outside -ErrorAction Stop | Out-Null
+        }
+        catch {
+            $script:SkipCurrentTest = $true
+            Write-Host "[SKIP] symlink creation is unavailable: $($_.Exception.Message)" -ForegroundColor Yellow
+            return
+        }
+        try {
+            $updater = Join-Path $projectRoot "tools/update-generated-integrity.ps1"
+            @(& $PowerShellExecutable -NoProfile -ExecutionPolicy Bypass -File $updater -Source "link/source.txt" -Artifact "generated.txt" -Generator test 2>&1) | Out-Null
+            Assert-True ($LASTEXITCODE -ne 0) "generated-integrity crossed a symlink boundary"
+        }
+        finally {
+            Remove-Item -LiteralPath $link -Force -ErrorAction SilentlyContinue
+        }
+    }
+}
+Invoke-TestCase "command cwd rejects a symlink boundary" {
+    Invoke-KntFixture -Name "valid-minimal" -Command "test" -ExpectedExit 1 -Prepare {
+        param($root)
+        $outside = Join-Path $root "outside-target"
+        New-Item -ItemType Directory -Path $outside -Force | Out-Null
+        $link = Join-Path $root "project/link"
+        try {
+            New-Item -ItemType SymbolicLink -Path $link -Target $outside -ErrorAction Stop | Out-Null
+        }
+        catch {
+            $script:SkipCurrentTest = $true
+            Write-Host "[SKIP] symlink creation is unavailable: $($_.Exception.Message)" -ForegroundColor Yellow
+            return
+        }
+        $manifestPath = Join-Path $root "project/project.json"
+        $manifest = Get-Content -Raw -Encoding UTF8 $manifestPath | ConvertFrom-Json
+        $manifest.commands.test = [pscustomobject]@{
+            run = "Get-Location | Out-File command-cwd.marker"
+            cwd = "project/link"
+        }
+        [IO.File]::WriteAllText($manifestPath, (ConvertTo-Json $manifest -Depth 20) + [Environment]::NewLine, (New-Object System.Text.UTF8Encoding($false)))
+    } -AssertOutput {
+        param($root, $output)
+        Assert-True ($output -match "symlink|junction|reparse|boundary") "command cwd symlink boundary was not reported"
+    }
+}
+Invoke-TestCase "Default upgrade removes an unchanged stale file" {
+    Invoke-KntFixture -Name "valid-minimal" -Command "migrate" -Arguments @("--apply", "--default", "pwa") -ExpectedExit 0 -Prepare {
+        param($root)
+        $manifestPath = Join-Path $root "project/project.json"
+        $manifest = Get-Content -Raw -Encoding UTF8 $manifestPath | ConvertFrom-Json
+        $manifest.surfaces.web = $true
+        [IO.File]::WriteAllText($manifestPath, (ConvertTo-Json $manifest -Depth 20) + [Environment]::NewLine, (New-Object System.Text.UTF8Encoding($false)))
+        $stalePath = Join-Path $root "project/public/legacy.js"
+        New-Item -ItemType Directory -Path (Split-Path -Parent $stalePath) -Force | Out-Null
+        Set-Content -LiteralPath $stalePath -Value "legacy" -NoNewline
+        $staleHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $stalePath).Hash.ToLowerInvariant()
+        $defaults = [pscustomobject]@{
+            schema_version = 1
+            packs = [pscustomobject]@{
+                pwa = [pscustomobject]@{
+                    state = "DEFAULT"
+                    source_base_version = "0.5.1"
+                    materialized_files = @([pscustomobject]@{ path = "project/public/legacy.js"; sha256 = $staleHash })
+                }
+            }
+        }
+        [IO.File]::WriteAllText((Join-Path $root "project/defaults.json"), (ConvertTo-Json $defaults -Depth 20) + [Environment]::NewLine, (New-Object System.Text.UTF8Encoding($false)))
+    } -AssertOutput {
+        param($root, $output)
+        Assert-True (-not (Test-Path (Join-Path $root "project/public/legacy.js"))) "unchanged stale Default file was not removed"
+        Assert-True (Test-Path (Join-Path $root "project/public/manifest.webmanifest")) "new Default file was not materialized"
+        $defaults = Get-Content -Raw -Encoding UTF8 (Join-Path $root "project/defaults.json") | ConvertFrom-Json
+        Assert-True (@($defaults.packs.pwa.materialized_files | Where-Object { $_.path -eq "project/public/legacy.js" }).Count -eq 0) "stale path remained in provenance"
+    }
+}
+Invoke-TestCase "Default upgrade preserves a modified stale file and records OVERRIDE" {
+    Invoke-KntFixture -Name "valid-minimal" -Command "migrate" -Arguments @("--apply", "--default", "pwa") -ExpectedExit 0 -Prepare {
+        param($root)
+        $manifestPath = Join-Path $root "project/project.json"
+        $manifest = Get-Content -Raw -Encoding UTF8 $manifestPath | ConvertFrom-Json
+        $manifest.surfaces.web = $true
+        [IO.File]::WriteAllText($manifestPath, (ConvertTo-Json $manifest -Depth 20) + [Environment]::NewLine, (New-Object System.Text.UTF8Encoding($false)))
+        $stalePath = Join-Path $root "project/public/legacy.js"
+        New-Item -ItemType Directory -Path (Split-Path -Parent $stalePath) -Force | Out-Null
+        Set-Content -LiteralPath $stalePath -Value "legacy" -NoNewline
+        $recordedHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $stalePath).Hash.ToLowerInvariant()
+        Set-Content -LiteralPath $stalePath -Value "modified" -NoNewline
+        $defaults = [pscustomobject]@{
+            schema_version = 1
+            packs = [pscustomobject]@{
+                pwa = [pscustomobject]@{
+                    state = "DEFAULT"
+                    source_base_version = "0.5.1"
+                    materialized_files = @([pscustomobject]@{ path = "project/public/legacy.js"; sha256 = $recordedHash })
+                }
+            }
+        }
+        [IO.File]::WriteAllText((Join-Path $root "project/defaults.json"), (ConvertTo-Json $defaults -Depth 20) + [Environment]::NewLine, (New-Object System.Text.UTF8Encoding($false)))
+    } -AssertOutput {
+        param($root, $output)
+        $defaults = Get-Content -Raw -Encoding UTF8 (Join-Path $root "project/defaults.json") | ConvertFrom-Json
+        Assert-Equal "OVERRIDE" $defaults.packs.pwa.state "modified stale Default state"
+        Assert-Equal "modified" (Get-Content -Raw -Encoding UTF8 (Join-Path $root "project/public/legacy.js")) "modified stale file"
+        Assert-True (-not (Test-Path (Join-Path $root "project/public/manifest.webmanifest"))) "conflicting stale file did not preserve atomicity"
+        Assert-True ($output -match "conflict|OVERRIDE") "modified stale conflict was not reported"
+    }
+}
+Invoke-TestCase "DISABLED Default dry-run reports tracked cleanup without writing" {
+    Invoke-KntFixture -Name "valid-minimal" -Command "migrate" -ExpectedExit 0 -Prepare {
+        param($root)
+        $manifestPath = Join-Path $root "project/project.json"
+        $manifest = Get-Content -Raw -Encoding UTF8 $manifestPath | ConvertFrom-Json
+        $manifest.paths | Add-Member -NotePropertyName defaults -NotePropertyValue "defaults.json" -Force
+        [IO.File]::WriteAllText($manifestPath, (ConvertTo-Json $manifest -Depth 20) + [Environment]::NewLine, (New-Object System.Text.UTF8Encoding($false)))
+        $filePath = Join-Path $root "project/tools/disabled-helper.ps1"
+        New-Item -ItemType Directory -Path (Split-Path -Parent $filePath) -Force | Out-Null
+        Set-Content -LiteralPath $filePath -Value "disabled" -NoNewline
+        $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $filePath).Hash.ToLowerInvariant()
+        $defaults = [pscustomobject]@{ schema_version = 1; packs = [pscustomobject]@{ pwa = [pscustomobject]@{ state = "DISABLED"; materialized_files = @([pscustomobject]@{ path = "project/tools/disabled-helper.ps1"; sha256 = $hash }) } } }
+        [IO.File]::WriteAllText((Join-Path $root "project/defaults.json"), (ConvertTo-Json $defaults -Depth 20) + [Environment]::NewLine, (New-Object System.Text.UTF8Encoding($false)))
+    } -AssertOutput {
+        param($root, $output)
+        Assert-True (Test-Path (Join-Path $root "project/tools/disabled-helper.ps1")) "DISABLED dry-run removed a file"
+        Assert-True ($output -match "DISABLED.*scheduled for removal") "DISABLED cleanup was not reported"
+    }
+}
+Invoke-TestCase "DISABLED Default apply removes unchanged tracked files" {
+    Invoke-KntFixture -Name "valid-minimal" -Command "migrate" -Arguments @("--apply") -ExpectedExit 0 -Prepare {
+        param($root)
+        $manifestPath = Join-Path $root "project/project.json"
+        $manifest = Get-Content -Raw -Encoding UTF8 $manifestPath | ConvertFrom-Json
+        $manifest.paths | Add-Member -NotePropertyName defaults -NotePropertyValue "defaults.json" -Force
+        [IO.File]::WriteAllText($manifestPath, (ConvertTo-Json $manifest -Depth 20) + [Environment]::NewLine, (New-Object System.Text.UTF8Encoding($false)))
+        $filePath = Join-Path $root "project/tools/disabled-helper.ps1"
+        New-Item -ItemType Directory -Path (Split-Path -Parent $filePath) -Force | Out-Null
+        Set-Content -LiteralPath $filePath -Value "disabled" -NoNewline
+        $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $filePath).Hash.ToLowerInvariant()
+        $defaults = [pscustomobject]@{ schema_version = 1; packs = [pscustomobject]@{ pwa = [pscustomobject]@{ state = "DISABLED"; materialized_files = @([pscustomobject]@{ path = "project/tools/disabled-helper.ps1"; sha256 = $hash }) } } }
+        [IO.File]::WriteAllText((Join-Path $root "project/defaults.json"), (ConvertTo-Json $defaults -Depth 20) + [Environment]::NewLine, (New-Object System.Text.UTF8Encoding($false)))
+    } -AssertOutput {
+        param($root, $output)
+        Assert-True (-not (Test-Path (Join-Path $root "project/tools/disabled-helper.ps1"))) "DISABLED apply preserved an unchanged file"
+        $defaults = Get-Content -Raw -Encoding UTF8 (Join-Path $root "project/defaults.json") | ConvertFrom-Json
+        Assert-Equal "DISABLED" $defaults.packs.pwa.state "DISABLED state changed during cleanup"
+        Assert-True ($null -eq $defaults.packs.pwa.PSObject.Properties["materialized_files"]) "DISABLED provenance was not cleared"
+    }
+}
+Invoke-TestCase "doctor rejects a modified DISABLED materialized file" {
+    Invoke-KntFixture -Name "valid-minimal" -Command "doctor" -ExpectedExit 1 -Prepare {
+        param($root)
+        $manifestPath = Join-Path $root "project/project.json"
+        $manifest = Get-Content -Raw -Encoding UTF8 $manifestPath | ConvertFrom-Json
+        $manifest.paths | Add-Member -NotePropertyName defaults -NotePropertyValue "defaults.json" -Force
+        [IO.File]::WriteAllText($manifestPath, (ConvertTo-Json $manifest -Depth 20) + [Environment]::NewLine, (New-Object System.Text.UTF8Encoding($false)))
+        $filePath = Join-Path $root "project/tools/disabled-helper.ps1"
+        New-Item -ItemType Directory -Path (Split-Path -Parent $filePath) -Force | Out-Null
+        Set-Content -LiteralPath $filePath -Value "original" -NoNewline
+        $oldHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $filePath).Hash.ToLowerInvariant()
+        Set-Content -LiteralPath $filePath -Value "modified" -NoNewline
+        $defaults = [pscustomobject]@{ schema_version = 1; packs = [pscustomobject]@{ pwa = [pscustomobject]@{ state = "DISABLED"; materialized_files = @([pscustomobject]@{ path = "project/tools/disabled-helper.ps1"; sha256 = $oldHash }) } } }
+        [IO.File]::WriteAllText((Join-Path $root "project/defaults.json"), (ConvertTo-Json $defaults -Depth 20) + [Environment]::NewLine, (New-Object System.Text.UTF8Encoding($false)))
+    } -AssertOutput {
+        param($root, $output)
+        Assert-True ($output -match "DISABLED.*modified|mark the pack OVERRIDE") "modified DISABLED file was not rejected"
     }
 }
 Invoke-TestCase "unknown catalog Default is rejected" {
@@ -937,7 +1164,7 @@ Invoke-TestCase "migrate apply materializes missing safe Tool Default files" {
         Assert-True (Test-Path -LiteralPath (Join-Path $root "project/tools/pwa-check.ps1") -PathType Leaf) "migrate apply did not materialize PWA checker"
         $defaults = Get-Content -Raw -Encoding UTF8 (Join-Path $root "project/defaults.json") | ConvertFrom-Json
         Assert-Equal "DEFAULT" $defaults.packs.pwa.state "migrate applied Tool Default state"
-        Assert-True ($output -match "Tool Default 'pwa' added") "migrate apply did not report materialized PWA files"
+        Assert-True ($output -match "Tool Default 'pwa' materialized") "migrate apply did not report materialized PWA files"
     }
 }
 Invoke-TestCase "migrate apply records conflicting Default files as OVERRIDE" {
@@ -1183,16 +1410,31 @@ Write-Output "agent-kit-ok"
         Assert-True ($helperText -notmatch "Planner|Memory|AgentBackend|ResourceLedger") "Agent helper captured Project-owned policy"
     }
 }
-Invoke-TestCase "Base CI workflow covers Ubuntu pwsh and Windows PowerShell hosts" {
-    foreach ($workflowPath in @(
-        (Join-Path $RepoRoot ".github/workflows/verify.yml"),
-        (Join-Path $RepoRoot ".kinotch/templates/defaults/ci-test/.github/workflows/kinotch-default.yml")
-    )) {
-        $workflow = Get-Content -Raw -Encoding UTF8 $workflowPath
-        Assert-True ($workflow -match "ubuntu-latest") "CI workflow is missing Ubuntu"
-        Assert-True ($workflow -match "windows-latest") "CI workflow is missing Windows"
-        Assert-True ($workflow -match "powershell") "CI workflow is missing Windows PowerShell 5.1"
-        Assert-True ($workflow -match "pwsh") "CI workflow is missing PowerShell Core"
+Invoke-TestCase "Base CI matrix and Project CI template have separate responsibilities" {
+    $baseWorkflow = Get-Content -Raw -Encoding UTF8 (Join-Path $RepoRoot ".github/workflows/verify.yml")
+    Assert-True ($baseWorkflow -match "matrix") "Base CI workflow lost its cross-platform matrix"
+    Assert-True ($baseWorkflow -match "ubuntu-latest") "Base CI workflow is missing Ubuntu"
+    Assert-True ($baseWorkflow -match "windows-latest") "Base CI workflow is missing Windows"
+    Assert-True ($baseWorkflow -match "powershell") "Base CI workflow is missing Windows PowerShell 5.1"
+    Assert-True ($baseWorkflow -match "pwsh") "Base CI workflow is missing PowerShell Core"
+
+    $projectTemplate = Get-Content -Raw -Encoding UTF8 (Join-Path $RepoRoot ".kinotch/templates/defaults/ci-test/.github/workflows/kinotch-default.yml")
+    Assert-True ($projectTemplate -match "runs-on: ubuntu-latest") "Project CI template is missing the default Ubuntu runner"
+    Assert-True ($projectTemplate -match "shell: pwsh") "Project CI template is missing PowerShell Core"
+    Assert-True ($projectTemplate -notmatch "matrix|windows-latest|powershell") "Project CI template imposes the Base three-environment matrix"
+}
+Invoke-TestCase "Project ci-test selects one Surface-appropriate runner" {
+    Invoke-KntInitFixture -Profiles @("cli") -Defaults @("ci-test") -RemoveExistingCi -AssertOutput {
+        param($root, $output)
+        $workflow = Get-Content -Raw -Encoding UTF8 (Join-Path $root ".github/workflows/kinotch-default.yml")
+        Assert-True ($workflow -match "runs-on: ubuntu-latest") "CLI Project ci-test did not select Ubuntu"
+        Assert-True ($workflow -notmatch "windows-latest|matrix") "CLI Project ci-test imposed a Windows or matrix runner"
+    }
+    Invoke-KntInitFixture -Profiles @("windows-gui") -Defaults @("ci-test") -RemoveExistingCi -AssertOutput {
+        param($root, $output)
+        $workflow = Get-Content -Raw -Encoding UTF8 (Join-Path $root ".github/workflows/kinotch-default.yml")
+        Assert-True ($workflow -match "runs-on: windows-latest") "Windows Project ci-test did not select Windows"
+        Assert-True ($workflow -notmatch "matrix") "Windows Project ci-test imposed a matrix runner"
     }
 }
 Invoke-TestCase "API Default envelope remains a permissive boundary descriptor" {
@@ -1478,7 +1720,7 @@ Invoke-TestCase "Base documentation and profile metadata are finalized" {
     Assert-True ($workflow -match "knt\.ps1 setup") "Base CI setup step is missing"
     Assert-True ($workflow -match "actions/checkout@[0-9a-f]{40}(?:\s+#\s+v4)?") "Base Verify checkout action is not pinned to a full commit SHA"
     Assert-Equal 0 @($surfaceRegistry.surfaces.PSObject.Properties).Count "Base Surface Registry should be empty"
-    Assert-Equal "0.5.1" $baseVersion "Base version"
+    Assert-Equal "0.5.2" $baseVersion "Base version"
     Assert-True ($baseReadme -match "Surface Default Kit") "README_BASE Surface Kit wording is missing"
     Assert-True ($baseReadme -match "OVERRIDE") "README_BASE override boundary is missing"
     Assert-True (@($catalog.defaults | Where-Object { $_.kind -eq "surface" }).Count -ge 8) "Surface Default catalog entries are incomplete"
@@ -1511,6 +1753,6 @@ Invoke-TestCase "base-refresh is restricted to repository-base" {
     }
 }
 
-Write-Host "Self-test summary: passed=$Passed failed=$Failed"
+Write-Host "Self-test summary: passed=$Passed failed=$Failed skipped=$Skipped"
 if ($Failed -gt 0) { exit 1 }
 exit 0

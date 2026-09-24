@@ -1,26 +1,19 @@
 param(
     [Parameter(Mandatory=$true)][string]$Artifact,
     [Parameter(Mandatory=$true)][string]$Source,
-    [Parameter(Mandatory=$true)][string]$Generator,
-    [string]$Root = (Split-Path -Parent $PSScriptRoot)
+    [Parameter(Mandatory=$true)][string]$Generator
 )
 
 $ErrorActionPreference = "Stop"
 $repositoryRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot "../.."))
 . (Join-Path $repositoryRoot ".kinotch/scripts/path-containment.ps1")
-$configPath = Join-Path $Root "generated-integrity.json"
+$projectRoot = [IO.Path]::GetFullPath((Join-Path $repositoryRoot "project"))
+$configPath = Assert-KntSafeWritePath -Root $projectRoot -Candidate (Join-Path $projectRoot "generated-integrity.json") -Description "generated-integrity configuration"
 if ([IO.Path]::IsPathRooted($Artifact) -or [IO.Path]::IsPathRooted($Source)) {
     throw "Generated source and artifact paths must be relative to the Project root"
 }
-$rootPath = [IO.Path]::GetFullPath($Root).TrimEnd([char[]]@("/", "\"))
-$artifactPath = [IO.Path]::GetFullPath((Join-Path $rootPath $Artifact))
-$sourcePath = [IO.Path]::GetFullPath((Join-Path $rootPath $Source))
-if (-not (Test-KntProjectPathContained -Root $rootPath -Candidate $artifactPath)) {
-    throw "Generated artifact path is outside the Project root: $Artifact"
-}
-if (-not (Test-KntProjectPathContained -Root $rootPath -Candidate $sourcePath)) {
-    throw "Generated source path is outside the Project root: $Source"
-}
+$artifactPath = Assert-KntSafePath -Root $projectRoot -Candidate (Join-Path $projectRoot $Artifact) -Description "Generated artifact path"
+$sourcePath = Assert-KntSafePath -Root $projectRoot -Candidate (Join-Path $projectRoot $Source) -Description "Generated source path"
 if (-not (Test-Path -LiteralPath $artifactPath -PathType Leaf)) { throw "Generated artifact not found: $Artifact" }
 if (-not (Test-Path -LiteralPath $sourcePath -PathType Leaf)) { throw "Generated source not found: $Source" }
 if (-not (Test-Path -LiteralPath $configPath -PathType Leaf)) { throw "generated-integrity.json is missing" }

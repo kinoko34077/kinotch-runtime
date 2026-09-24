@@ -1,10 +1,10 @@
 # Current State
 
-Last verified: 2026-09-24 — KiNoTch. Runtime v0.1 fourth/fifth Pilot design-probe evaluation complete; embedded Repository Base v0.5.1 common-layer sync verified
+Last verified: 2026-09-24 — KiNoTch. Runtime v0.1 fourth/fifth Pilot design-probe evaluation complete; embedded Repository Base v0.5.2 common-layer sync verified
 
 ## Implemented
 
-- Embedded Repository Base v0.5.1 common layer (synced from the Repository Base)
+- Embedded Repository Base v0.5.2 common layer (synced from the Repository Base)
 - Python reference Runtime package under `project/src/kinotch_runtime/`
 - Action registry and execution kernel
 - Structured result and extensible error values

@@ -129,20 +129,27 @@ nothing. Only `knt migrate --apply` records candidates. Existing `OVERRIDE` and
 
 ## Actual implementation boundary
 
-The current v0.5.1 implementation materializes only removable helpers; the
-v0.5.0 feature slice remains unchanged:
+The current v0.5.2 implementation materializes only removable helpers; the
+safe lifecycle boundary is part of the same Default system:
 
-- `ci-test` adds a separate non-deploy GitHub Actions workflow when absent; it runs `doctor` → `setup` → `verify`. The Base repository's own workflow is not overwritten.
+- `ci-test` adds a separate non-deploy GitHub Actions workflow when absent; it runs `doctor` → `setup` → `verify` on one runner selected from the Manifest (`gui_windows` uses Windows PowerShell, otherwise Ubuntu PowerShell). The Base repository's own three-environment workflow is not overwritten.
 - `pwa` adds a minimal manifest with relative base-path URLs, a pass-through service worker, registration helper, and `pwa-check`.
 - `generated-integrity` adds source and artifact SHA-256 metadata, Project-root containment checks, stale checking for both, and metadata update helpers.
 - `file-io` adds a format-independent Project callback boundary and a UTF-8 text-only helper; binary Projects provide their own byte/path callback.
 - `cli` adds opt-in JSON/error/help/exit helpers without parsing Domain arguments.
-- `windows` adds opt-in Explorer/clipboard shell boundaries; GUI state and picker ownership remain Project-owned.
+- `windows` adds picker, Save / Save As, D&D path normalization, progress/cancel state, error-dialog, Explorer, and clipboard shell boundaries; GUI state, serialization, validation, and screen/navigation behavior remain Project-owned.
 - `mcp` adds executable tool-name, input-validator, path, diagnostic, error, and capability helpers without a second dispatch registry.
 - `api` adds request/correlation context, health, a permissive error-envelope schema, and named replaceable hooks; HTTP status, error code policy, auth, and provider behavior remain Project-owned.
 - `agent` adds invocation context, diagnostics, capabilities, and a boundary hook; AgentBackend, planning, memory, authority, and recovery remain Project-owned.
 - `config` adds shallow map merge and explicit-key display redaction; it does not read files, choose environment names, parse CLI options, or infer secrets.
 - `logging` adds UTC structured records, stderr output, and caller-provided sink/redactor hooks; event taxonomy, telemetry, rotation, and retention remain Project-owned.
+
+Default provenance records the source Base version and final materialized-file
+hashes. Upgrade planning considers both the current template tree and recorded
+files: unchanged stale files may be removed, modified stale files are preserved
+and move the pack to `OVERRIDE`, and `DISABLED` cleanup is shown in dry-run and
+performed only by explicit `--apply`. Default and generated writes reject
+symlink, junction, and reparse-point traversal below trusted roots.
 
 Surface Kits are implementation defaults, not Portable Contracts. Their presence
 does not require a Runtime module, a framework, a second registry, or a public

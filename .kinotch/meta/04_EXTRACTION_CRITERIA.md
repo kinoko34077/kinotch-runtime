@@ -38,7 +38,7 @@ Project固有情報、Domain処理、公開API policy、永続形式は入れな
 低リスクで安全に外せる共通実装。`DEFAULT`、`OVERRIDE`、`DISABLED`だけで
 Project単位の採用状態を表す。
 
-現行Surface Kit候補:
+現行Surface Kit:
 
 - CLIの共通option、JSON / stderr / exit補助
 - Windowsのpicker、Save、D&D、Progress、Cancel、Explorer / Clipboard境界
