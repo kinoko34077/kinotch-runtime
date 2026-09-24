@@ -129,7 +129,8 @@ nothing. Only `knt migrate --apply` records candidates. Existing `OVERRIDE` and
 
 ## Actual implementation boundary
 
-The current v0.5.0 implementation materializes only removable helpers:
+The current v0.5.1 implementation materializes only removable helpers; the
+v0.5.0 feature slice remains unchanged:
 
 - `ci-test` adds a separate non-deploy GitHub Actions workflow when absent; it runs `doctor` → `setup` → `verify`. The Base repository's own workflow is not overwritten.
 - `pwa` adds a minimal manifest with relative base-path URLs, a pass-through service worker, registration helper, and `pwa-check`.

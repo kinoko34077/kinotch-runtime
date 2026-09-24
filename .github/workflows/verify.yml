@@ -20,14 +20,14 @@ jobs:
           - os: windows-latest
             shell: powershell
     runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: ${{ matrix.shell }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - name: Base / project diagnostics
-        shell: ${{ matrix.shell }}
         run: ./.kinotch/scripts/knt.ps1 doctor
       - name: Project setup
-        shell: ${{ matrix.shell }}
         run: ./.kinotch/scripts/knt.ps1 setup
       - name: Project verification
-        shell: ${{ matrix.shell }}
         run: ./.kinotch/scripts/knt.ps1 verify

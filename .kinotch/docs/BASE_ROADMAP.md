@@ -27,7 +27,7 @@
 
 ## Phase 3 — Default implementation
 
-現行Base v0.5.0で安全な実装sliceを固定する。
+現行Base v0.5.1でv0.5.0の安全な実装sliceとHosted CI修正を固定する。
 
 - Surface Kits: `minimal`, `web-app`, `cli`, `windows`, `mcp`, `api`, `agent`, `library`
 - Tool Defaults: `ci-test`, `generated-integrity`, `file-io`, `pwa`, `config`, `logging`

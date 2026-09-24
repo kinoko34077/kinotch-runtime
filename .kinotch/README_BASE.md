@@ -1,6 +1,6 @@
 # KiNoTch. Repository Base — Common README
 
-Base version: `0.5.0`
+Base version: `0.5.1`
 
 この文書はKiNoTch.標準リポジトリの共通取扱説明書である。個別READMEへ同じ説明を複製しない。
 
@@ -15,7 +15,7 @@ KiNoTch.Runtime = 複数repoで再利用する共通実装。個別repoへコピ
 
 Base-wide Metaは `.kinotch/meta/` に置き、新規Repository用の生成元は `.kinotch/templates/project/` に置く。Base自身のProject情報は `project/**` に記録し、Templateと混同しない。
 
-Base v0.5.0はPhase 5のSurface Default Kit機能releaseである。CLI、Windows、MCP、API、AgentのSurface Kitと、ci-test、generated-integrity、file-io、pwa、config、loggingのTool Defaultは、Domain非依存で安全に外せる補助境界を提供する。既存FrameworkやProject実装はOVERRIDEとして維持でき、Runtime semanticsは変更しない。通常の運用方針は [Phase 5 Operations](meta/07_PHASE5_OPERATIONS.md) を参照する。
+Base v0.5.1は、v0.5.0のSurface Default Kit機能releaseへHosted CI修正を適用したbugfix releaseである。CLI、Windows、MCP、API、AgentのSurface Kitと、ci-test、generated-integrity、file-io、pwa、config、loggingのTool Defaultは、Domain非依存で安全に外せる補助境界を提供する。既存FrameworkやProject実装はOVERRIDEとして維持でき、Runtime semanticsは変更しない。通常の運用方針は [Phase 5 Operations](meta/07_PHASE5_OPERATIONS.md) を参照する。
 
 ## Default-first
 
