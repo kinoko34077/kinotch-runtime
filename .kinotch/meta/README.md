@@ -9,6 +9,7 @@
 - 個別repoの処理をBase / Runtimeへ昇格させるか判断するとき
 - Baseの構造や共通境界の理由を確認するとき
 - 既存repoをBase準拠へ移行するとき
+- 複数RepositoryをGitHub上で横断管理するとき
 
 ## 読み順
 
@@ -20,6 +21,7 @@
 6. [05_VALIDATION_PLAN.md](05_VALIDATION_PLAN.md) — 実repoでの検証方法
 7. [06_DEFAULT_FIRST_STANDARD.md](06_DEFAULT_FIRST_STANDARD.md) — Default-first標準化方針
 8. [07_PHASE5_OPERATIONS.md](07_PHASE5_OPERATIONS.md) — Phase 5通常運用とBase freeze
+9. [08_GITHUB_DEVELOPMENT_CONTROL.md](08_GITHUB_DEVELOPMENT_CONTROL.md) — GitHub Projects / Issues / PRを用いた横断開発管理とAgent操作境界
 
 ## 位置づけ
 

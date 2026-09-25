@@ -320,6 +320,8 @@ Invoke-TestCase "Protected paths and Base index use canonical separators" {
     $indexedPaths = @($index.files | ForEach-Object { [string]$_.path })
     Assert-True (@($indexedPaths | Where-Object { $_ -match "^[\\/]" }).Count -eq 0) "index path has a leading separator"
     Assert-True (@($indexedPaths | Where-Object { $_ -match "\\" }).Count -eq 0) "index path contains a Windows separator"
+    $inventoryEntry = $index.files | Where-Object path -eq ".kinotch/FILE_INVENTORY.txt"
+    Assert-Equal (Get-BaseFileHash (Join-Path $RepoRoot ".kinotch/FILE_INVENTORY.txt")) $inventoryEntry.sha256 "index inventory hash"
 }
 
 Invoke-TestCase "Project path containment is OS-aware and rejects sibling escapes" {
@@ -904,6 +906,10 @@ Invoke-TestCase "Default upgrade removes an unchanged stale file" {
         $manifest = Get-Content -Raw -Encoding UTF8 $manifestPath | ConvertFrom-Json
         $manifest.surfaces.web = $true
         [IO.File]::WriteAllText($manifestPath, (ConvertTo-Json $manifest -Depth 20) + [Environment]::NewLine, (New-Object System.Text.UTF8Encoding($false)))
+        $catalogPath = Join-Path $root ".kinotch/defaults/catalog.json"
+        $catalog = Get-Content -Raw -Encoding UTF8 $catalogPath | ConvertFrom-Json
+        ($catalog.defaults | Where-Object id -eq "pwa") | Add-Member -NotePropertyName retired_paths -NotePropertyValue @("project/public/legacy.js") -Force
+        [IO.File]::WriteAllText($catalogPath, (ConvertTo-Json $catalog -Depth 20) + [Environment]::NewLine, (New-Object System.Text.UTF8Encoding($false)))
         $stalePath = Join-Path $root "project/public/legacy.js"
         New-Item -ItemType Directory -Path (Split-Path -Parent $stalePath) -Force | Out-Null
         Set-Content -LiteralPath $stalePath -Value "legacy" -NoNewline
@@ -934,6 +940,10 @@ Invoke-TestCase "Default upgrade preserves a modified stale file and records OVE
         $manifest = Get-Content -Raw -Encoding UTF8 $manifestPath | ConvertFrom-Json
         $manifest.surfaces.web = $true
         [IO.File]::WriteAllText($manifestPath, (ConvertTo-Json $manifest -Depth 20) + [Environment]::NewLine, (New-Object System.Text.UTF8Encoding($false)))
+        $catalogPath = Join-Path $root ".kinotch/defaults/catalog.json"
+        $catalog = Get-Content -Raw -Encoding UTF8 $catalogPath | ConvertFrom-Json
+        ($catalog.defaults | Where-Object id -eq "pwa") | Add-Member -NotePropertyName retired_paths -NotePropertyValue @("project/public/legacy.js") -Force
+        [IO.File]::WriteAllText($catalogPath, (ConvertTo-Json $catalog -Depth 20) + [Environment]::NewLine, (New-Object System.Text.UTF8Encoding($false)))
         $stalePath = Join-Path $root "project/public/legacy.js"
         New-Item -ItemType Directory -Path (Split-Path -Parent $stalePath) -Force | Out-Null
         Set-Content -LiteralPath $stalePath -Value "legacy" -NoNewline
@@ -966,15 +976,15 @@ Invoke-TestCase "DISABLED Default dry-run reports tracked cleanup without writin
         $manifest = Get-Content -Raw -Encoding UTF8 $manifestPath | ConvertFrom-Json
         $manifest.paths | Add-Member -NotePropertyName defaults -NotePropertyValue "defaults.json" -Force
         [IO.File]::WriteAllText($manifestPath, (ConvertTo-Json $manifest -Depth 20) + [Environment]::NewLine, (New-Object System.Text.UTF8Encoding($false)))
-        $filePath = Join-Path $root "project/tools/disabled-helper.ps1"
+        $filePath = Join-Path $root "project/public/manifest.webmanifest"
         New-Item -ItemType Directory -Path (Split-Path -Parent $filePath) -Force | Out-Null
         Set-Content -LiteralPath $filePath -Value "disabled" -NoNewline
         $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $filePath).Hash.ToLowerInvariant()
-        $defaults = [pscustomobject]@{ schema_version = 1; packs = [pscustomobject]@{ pwa = [pscustomobject]@{ state = "DISABLED"; materialized_files = @([pscustomobject]@{ path = "project/tools/disabled-helper.ps1"; sha256 = $hash }) } } }
+        $defaults = [pscustomobject]@{ schema_version = 1; packs = [pscustomobject]@{ pwa = [pscustomobject]@{ state = "DISABLED"; materialized_files = @([pscustomobject]@{ path = "project/public/manifest.webmanifest"; sha256 = $hash }) } } }
         [IO.File]::WriteAllText((Join-Path $root "project/defaults.json"), (ConvertTo-Json $defaults -Depth 20) + [Environment]::NewLine, (New-Object System.Text.UTF8Encoding($false)))
     } -AssertOutput {
         param($root, $output)
-        Assert-True (Test-Path (Join-Path $root "project/tools/disabled-helper.ps1")) "DISABLED dry-run removed a file"
+        Assert-True (Test-Path (Join-Path $root "project/public/manifest.webmanifest")) "DISABLED dry-run removed a file"
         Assert-True ($output -match "DISABLED.*scheduled for removal") "DISABLED cleanup was not reported"
     }
 }
@@ -985,18 +995,61 @@ Invoke-TestCase "DISABLED Default apply removes unchanged tracked files" {
         $manifest = Get-Content -Raw -Encoding UTF8 $manifestPath | ConvertFrom-Json
         $manifest.paths | Add-Member -NotePropertyName defaults -NotePropertyValue "defaults.json" -Force
         [IO.File]::WriteAllText($manifestPath, (ConvertTo-Json $manifest -Depth 20) + [Environment]::NewLine, (New-Object System.Text.UTF8Encoding($false)))
-        $filePath = Join-Path $root "project/tools/disabled-helper.ps1"
+        $filePath = Join-Path $root "project/public/manifest.webmanifest"
         New-Item -ItemType Directory -Path (Split-Path -Parent $filePath) -Force | Out-Null
         Set-Content -LiteralPath $filePath -Value "disabled" -NoNewline
         $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $filePath).Hash.ToLowerInvariant()
-        $defaults = [pscustomobject]@{ schema_version = 1; packs = [pscustomobject]@{ pwa = [pscustomobject]@{ state = "DISABLED"; materialized_files = @([pscustomobject]@{ path = "project/tools/disabled-helper.ps1"; sha256 = $hash }) } } }
+        $defaults = [pscustomobject]@{ schema_version = 1; packs = [pscustomobject]@{ pwa = [pscustomobject]@{ state = "DISABLED"; materialized_files = @([pscustomobject]@{ path = "project/public/manifest.webmanifest"; sha256 = $hash }) } } }
         [IO.File]::WriteAllText((Join-Path $root "project/defaults.json"), (ConvertTo-Json $defaults -Depth 20) + [Environment]::NewLine, (New-Object System.Text.UTF8Encoding($false)))
     } -AssertOutput {
         param($root, $output)
-        Assert-True (-not (Test-Path (Join-Path $root "project/tools/disabled-helper.ps1"))) "DISABLED apply preserved an unchanged file"
+        Assert-True (-not (Test-Path (Join-Path $root "project/public/manifest.webmanifest"))) "DISABLED apply preserved an unchanged file"
         $defaults = Get-Content -Raw -Encoding UTF8 (Join-Path $root "project/defaults.json") | ConvertFrom-Json
         Assert-Equal "DISABLED" $defaults.packs.pwa.state "DISABLED state changed during cleanup"
         Assert-True ($null -eq $defaults.packs.pwa.PSObject.Properties["materialized_files"]) "DISABLED provenance was not cleared"
+    }
+}
+Invoke-TestCase "explicitly selected DISABLED Tool Default still reconciles" {
+    Invoke-KntFixture -Name "valid-minimal" -Command "migrate" -Arguments @("--apply", "--default", "logging") -ExpectedExit 0 -Prepare {
+        param($root)
+        $manifestPath = Join-Path $root "project/project.json"
+        $manifest = Get-Content -Raw -Encoding UTF8 $manifestPath | ConvertFrom-Json
+        $manifest.paths | Add-Member -NotePropertyName defaults -NotePropertyValue "defaults.json" -Force
+        [IO.File]::WriteAllText($manifestPath, (ConvertTo-Json $manifest -Depth 20) + [Environment]::NewLine, (New-Object Text.UTF8Encoding($false)))
+        $filePath = Join-Path $root "project/tools/logging-default.ps1"
+        New-Item -ItemType Directory -Path (Split-Path -Parent $filePath) -Force | Out-Null
+        Set-Content -LiteralPath $filePath -Value "disabled" -NoNewline
+        $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $filePath).Hash.ToLowerInvariant()
+        $defaults = [pscustomobject]@{ schema_version = 1; packs = [pscustomobject]@{ logging = [pscustomobject]@{ state = "DISABLED"; materialized_files = @([pscustomobject]@{ path = "project/tools/logging-default.ps1"; sha256 = $hash }) } } }
+        [IO.File]::WriteAllText((Join-Path $root "project/defaults.json"), (ConvertTo-Json $defaults -Depth 20) + [Environment]::NewLine, (New-Object Text.UTF8Encoding($false)))
+    } -AssertOutput {
+        param($root, $output)
+        Assert-True (-not (Test-Path (Join-Path $root "project/tools/logging-default.ps1"))) "selected DISABLED Tool Default was not reconciled"
+        $defaults = Get-Content -Raw -Encoding UTF8 (Join-Path $root "project/defaults.json") | ConvertFrom-Json
+        Assert-Equal "DISABLED" $defaults.packs.logging.state "selected DISABLED Tool state changed"
+        Assert-True ($null -eq $defaults.packs.logging.PSObject.Properties["materialized_files"]) "selected DISABLED Tool provenance remained"
+    }
+}
+Invoke-TestCase "explicitly selected DISABLED Surface Default still reconciles" {
+    Invoke-KntFixture -Name "valid-minimal" -Command "migrate" -Arguments @("--apply", "--profile", "cli") -ExpectedExit 0 -Prepare {
+        param($root)
+        $manifestPath = Join-Path $root "project/project.json"
+        $manifest = Get-Content -Raw -Encoding UTF8 $manifestPath | ConvertFrom-Json
+        $manifest.profile = "cli"
+        $manifest.surfaces.cli = $true
+        $manifest.paths | Add-Member -NotePropertyName defaults -NotePropertyValue "defaults.json" -Force
+        [IO.File]::WriteAllText($manifestPath, (ConvertTo-Json $manifest -Depth 20) + [Environment]::NewLine, (New-Object Text.UTF8Encoding($false)))
+        $filePath = Join-Path $root "project/tools/cli-default.ps1"
+        New-Item -ItemType Directory -Path (Split-Path -Parent $filePath) -Force | Out-Null
+        Set-Content -LiteralPath $filePath -Value "disabled" -NoNewline
+        $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $filePath).Hash.ToLowerInvariant()
+        $defaults = [pscustomobject]@{ schema_version = 1; packs = [pscustomobject]@{ cli = [pscustomobject]@{ state = "DISABLED"; materialized_files = @([pscustomobject]@{ path = "project/tools/cli-default.ps1"; sha256 = $hash }) } } }
+        [IO.File]::WriteAllText((Join-Path $root "project/defaults.json"), (ConvertTo-Json $defaults -Depth 20) + [Environment]::NewLine, (New-Object Text.UTF8Encoding($false)))
+    } -AssertOutput {
+        param($root, $output)
+        Assert-True (-not (Test-Path (Join-Path $root "project/tools/cli-default.ps1"))) "selected DISABLED Surface Default was not reconciled"
+        $defaults = Get-Content -Raw -Encoding UTF8 (Join-Path $root "project/defaults.json") | ConvertFrom-Json
+        Assert-Equal "DISABLED" $defaults.packs.cli.state "selected DISABLED Surface state changed"
     }
 }
 Invoke-TestCase "doctor rejects a modified DISABLED materialized file" {
@@ -1006,16 +1059,79 @@ Invoke-TestCase "doctor rejects a modified DISABLED materialized file" {
         $manifest = Get-Content -Raw -Encoding UTF8 $manifestPath | ConvertFrom-Json
         $manifest.paths | Add-Member -NotePropertyName defaults -NotePropertyValue "defaults.json" -Force
         [IO.File]::WriteAllText($manifestPath, (ConvertTo-Json $manifest -Depth 20) + [Environment]::NewLine, (New-Object System.Text.UTF8Encoding($false)))
-        $filePath = Join-Path $root "project/tools/disabled-helper.ps1"
+        $filePath = Join-Path $root "project/public/manifest.webmanifest"
         New-Item -ItemType Directory -Path (Split-Path -Parent $filePath) -Force | Out-Null
         Set-Content -LiteralPath $filePath -Value "original" -NoNewline
         $oldHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $filePath).Hash.ToLowerInvariant()
         Set-Content -LiteralPath $filePath -Value "modified" -NoNewline
-        $defaults = [pscustomobject]@{ schema_version = 1; packs = [pscustomobject]@{ pwa = [pscustomobject]@{ state = "DISABLED"; materialized_files = @([pscustomobject]@{ path = "project/tools/disabled-helper.ps1"; sha256 = $oldHash }) } } }
+        $defaults = [pscustomobject]@{ schema_version = 1; packs = [pscustomobject]@{ pwa = [pscustomobject]@{ state = "DISABLED"; materialized_files = @([pscustomobject]@{ path = "project/public/manifest.webmanifest"; sha256 = $oldHash }) } } }
         [IO.File]::WriteAllText((Join-Path $root "project/defaults.json"), (ConvertTo-Json $defaults -Depth 20) + [Environment]::NewLine, (New-Object System.Text.UTF8Encoding($false)))
     } -AssertOutput {
         param($root, $output)
         Assert-True ($output -match "DISABLED.*modified|mark the pack OVERRIDE") "modified DISABLED file was not rejected"
+    }
+}
+Invoke-TestCase "DISABLED cleanup does not trust unrelated provenance paths" {
+    Invoke-KntFixture -Name "valid-minimal" -Command "migrate" -Arguments @("--apply") -ExpectedExit 0 -Prepare {
+        param($root)
+        $manifestPath = Join-Path $root "project/project.json"
+        $manifest = Get-Content -Raw -Encoding UTF8 $manifestPath | ConvertFrom-Json
+        $manifest.paths | Add-Member -NotePropertyName defaults -NotePropertyValue "defaults.json" -Force
+        [IO.File]::WriteAllText($manifestPath, (ConvertTo-Json $manifest -Depth 20) + [Environment]::NewLine, (New-Object Text.UTF8Encoding($false)))
+        $unrelated = Join-Path $root "README.md"
+        $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $unrelated).Hash.ToLowerInvariant()
+        $defaults = [pscustomobject]@{ schema_version = 1; packs = [pscustomobject]@{ logging = [pscustomobject]@{ state = "DISABLED"; materialized_files = @([pscustomobject]@{ path = "README.md"; sha256 = $hash }) } } }
+        [IO.File]::WriteAllText((Join-Path $root "project/defaults.json"), (ConvertTo-Json $defaults -Depth 20) + [Environment]::NewLine, (New-Object Text.UTF8Encoding($false)))
+    } -AssertOutput {
+        param($root, $output)
+        Assert-True (Test-Path (Join-Path $root "README.md")) "unrelated provenance path was deleted"
+        Assert-True ($output -match "untrusted|conflict|README\.md") "untrusted provenance was not reported"
+    }
+}
+Invoke-TestCase "retired Default paths are trusted only when declared by the catalog" {
+    Invoke-KntFixture -Name "valid-minimal" -Command "migrate" -Arguments @("--apply") -ExpectedExit 0 -Prepare {
+        param($root)
+        $manifestPath = Join-Path $root "project/project.json"
+        $manifest = Get-Content -Raw -Encoding UTF8 $manifestPath | ConvertFrom-Json
+        $manifest.paths | Add-Member -NotePropertyName defaults -NotePropertyValue "defaults.json" -Force
+        [IO.File]::WriteAllText($manifestPath, (ConvertTo-Json $manifest -Depth 20) + [Environment]::NewLine, (New-Object Text.UTF8Encoding($false)))
+        $catalogPath = Join-Path $root ".kinotch/defaults/catalog.json"
+        $catalog = Get-Content -Raw -Encoding UTF8 $catalogPath | ConvertFrom-Json
+        ($catalog.defaults | Where-Object id -eq "logging") | Add-Member -NotePropertyName retired_paths -NotePropertyValue @("project/tools/retired-helper.ps1") -Force
+        [IO.File]::WriteAllText($catalogPath, (ConvertTo-Json $catalog -Depth 20) + [Environment]::NewLine, (New-Object Text.UTF8Encoding($false)))
+        $retired = Join-Path $root "project/tools/retired-helper.ps1"
+        New-Item -ItemType Directory -Path (Split-Path -Parent $retired) -Force | Out-Null
+        Set-Content -LiteralPath $retired -Value "retired" -NoNewline
+        $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $retired).Hash.ToLowerInvariant()
+        $defaults = [pscustomobject]@{ schema_version = 1; packs = [pscustomobject]@{ logging = [pscustomobject]@{ state = "DISABLED"; materialized_files = @([pscustomobject]@{ path = "project/tools/retired-helper.ps1"; sha256 = $hash }) } } }
+        [IO.File]::WriteAllText((Join-Path $root "project/defaults.json"), (ConvertTo-Json $defaults -Depth 20) + [Environment]::NewLine, (New-Object Text.UTF8Encoding($false)))
+    } -AssertOutput {
+        param($root, $output)
+        Assert-True (-not (Test-Path (Join-Path $root "project/tools/retired-helper.ps1"))) "declared retired Default path was not removed"
+    }
+}
+Invoke-TestCase "modified retired Default paths remain protected" {
+    Invoke-KntFixture -Name "valid-minimal" -Command "migrate" -Arguments @("--apply") -ExpectedExit 0 -Prepare {
+        param($root)
+        $manifestPath = Join-Path $root "project/project.json"
+        $manifest = Get-Content -Raw -Encoding UTF8 $manifestPath | ConvertFrom-Json
+        $manifest.paths | Add-Member -NotePropertyName defaults -NotePropertyValue "defaults.json" -Force
+        [IO.File]::WriteAllText($manifestPath, (ConvertTo-Json $manifest -Depth 20) + [Environment]::NewLine, (New-Object Text.UTF8Encoding($false)))
+        $catalogPath = Join-Path $root ".kinotch/defaults/catalog.json"
+        $catalog = Get-Content -Raw -Encoding UTF8 $catalogPath | ConvertFrom-Json
+        ($catalog.defaults | Where-Object id -eq "logging") | Add-Member -NotePropertyName retired_paths -NotePropertyValue @("project/tools/retired-helper.ps1") -Force
+        [IO.File]::WriteAllText($catalogPath, (ConvertTo-Json $catalog -Depth 20) + [Environment]::NewLine, (New-Object Text.UTF8Encoding($false)))
+        $retired = Join-Path $root "project/tools/retired-helper.ps1"
+        New-Item -ItemType Directory -Path (Split-Path -Parent $retired) -Force | Out-Null
+        Set-Content -LiteralPath $retired -Value "original" -NoNewline
+        $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $retired).Hash.ToLowerInvariant()
+        Set-Content -LiteralPath $retired -Value "modified" -NoNewline
+        $defaults = [pscustomobject]@{ schema_version = 1; packs = [pscustomobject]@{ logging = [pscustomobject]@{ state = "DISABLED"; materialized_files = @([pscustomobject]@{ path = "project/tools/retired-helper.ps1"; sha256 = $hash }) } } }
+        [IO.File]::WriteAllText((Join-Path $root "project/defaults.json"), (ConvertTo-Json $defaults -Depth 20) + [Environment]::NewLine, (New-Object Text.UTF8Encoding($false)))
+    } -AssertOutput {
+        param($root, $output)
+        Assert-Equal "modified" (Get-Content -Raw -Encoding UTF8 (Join-Path $root "project/tools/retired-helper.ps1")) "modified retired path was deleted"
+        Assert-True ($output -match "modified|OVERRIDE|conflict") "modified retired path conflict was not reported"
     }
 }
 Invoke-TestCase "unknown catalog Default is rejected" {
@@ -1685,12 +1801,76 @@ Invoke-TestCase "changed Base file fails base-check" {
     }
 }
 
-Invoke-TestCase "base-refresh indexes new common file" {
+Invoke-TestCase "base-refresh rejects protected changes without a version bump" {
+    Invoke-KntFixture -Name "valid-minimal" -Command "base-refresh" -ExpectedExit 2 -Prepare {
+        param($root)
+        Set-FixtureAsBase $root
+        Set-FixtureBaseIndex $root
+        $expectedIndex = Join-Path $root "project/expected-base-files.json"
+        $expectedInventory = Join-Path $root "project/expected-file-inventory.txt"
+        Copy-Item -LiteralPath (Join-Path $root ".kinotch/base-files.json") -Destination $expectedIndex
+        Copy-Item -LiteralPath (Join-Path $root ".kinotch/FILE_INVENTORY.txt") -Destination $expectedInventory
+        Add-Content -LiteralPath (Join-Path $root ".kinotch/README_BASE.md") -Value "changed without version bump"
+    } -AssertOutput {
+        param($root, $output)
+        Assert-True ($output -match "protected Base content changed without BASE_VERSION bump") "same-version protected change was not rejected"
+        Assert-Equal (Get-Content -Raw -LiteralPath (Join-Path $root "project/expected-base-files.json")) (Get-Content -Raw -LiteralPath (Join-Path $root ".kinotch/base-files.json")) "base-files.json changed after rejected refresh"
+        Assert-Equal (Get-Content -Raw -LiteralPath (Join-Path $root "project/expected-file-inventory.txt")) (Get-Content -Raw -LiteralPath (Join-Path $root ".kinotch/FILE_INVENTORY.txt")) "FILE_INVENTORY.txt changed after rejected refresh"
+    }
+}
+
+Invoke-TestCase "base-check rejects a protected symlink file" {
+    Invoke-KntFixture -Name "valid-minimal" -Command "base-check" -ExpectedExit 2 -Prepare {
+        param($root)
+        Set-FixtureBaseIndex $root
+        $outside = Join-Path $root "outside-base-file.txt"
+        Set-Content -LiteralPath $outside -Value "outside" -NoNewline
+        $protected = Join-Path $root ".kinotch/README_BASE.md"
+        Remove-Item -LiteralPath $protected -Force
+        try {
+            New-Item -ItemType SymbolicLink -Path $protected -Target $outside -ErrorAction Stop | Out-Null
+        }
+        catch {
+            $script:SkipCurrentTest = $true
+            Write-Host "[SKIP] symlink creation is unavailable: $($_.Exception.Message)" -ForegroundColor Yellow
+        }
+    } -AssertOutput {
+        param($root, $output)
+        if (-not $script:SkipCurrentTest) {
+            Assert-True ($output -match "UNSAFE|symlink|junction|reparse|boundary") "protected symlink was not rejected"
+        }
+    }
+}
+
+Invoke-TestCase "base-refresh rejects a symlinked .kinotch boundary" {
+    Invoke-KntFixture -Name "valid-minimal" -Command "base-refresh" -ExpectedExit 2 -Prepare {
+        param($root)
+        Set-FixtureAsBase $root
+        Set-FixtureBaseIndex $root
+        $realBase = Join-Path $root ".kinotch-real"
+        Move-Item -LiteralPath (Join-Path $root ".kinotch") -Destination $realBase
+        try {
+            New-Item -ItemType SymbolicLink -Path (Join-Path $root ".kinotch") -Target $realBase -ErrorAction Stop | Out-Null
+        }
+        catch {
+            $script:SkipCurrentTest = $true
+            Write-Host "[SKIP] symlink creation is unavailable: $($_.Exception.Message)" -ForegroundColor Yellow
+        }
+    } -AssertOutput {
+        param($root, $output)
+        if (-not $script:SkipCurrentTest) {
+            Assert-True ($output -match "symlink|junction|reparse|boundary") "symlinked .kinotch boundary was not rejected"
+        }
+    }
+}
+
+Invoke-TestCase "base-refresh indexes new common file after version bump" {
     Invoke-KntFixture -Name "valid-minimal" -Command "base-refresh" -ExpectedExit 0 -Prepare {
         param($root)
         Set-FixtureAsBase $root
         Set-FixtureBaseIndex $root
         Set-Content -LiteralPath (Join-Path $root ".kinotch/new-common.txt") -Value "new common file" -NoNewline
+        Set-Content -LiteralPath (Join-Path $root ".kinotch/BASE_VERSION") -Value "0.5.4" -NoNewline
         $router = Join-Path $root ".kinotch/scripts/knt.ps1"
         $before = @(& $PowerShellExecutable -NoProfile -ExecutionPolicy Bypass -File $router -RootOverride $root base-check 2>&1)
         if ($LASTEXITCODE -eq 0) { throw "unindexed Base file was not rejected: $($before -join ' ')" }
@@ -1720,7 +1900,7 @@ Invoke-TestCase "Base documentation and profile metadata are finalized" {
     Assert-True ($workflow -match "knt\.ps1 setup") "Base CI setup step is missing"
     Assert-True ($workflow -match "actions/checkout@[0-9a-f]{40}(?:\s+#\s+v4)?") "Base Verify checkout action is not pinned to a full commit SHA"
     Assert-Equal 0 @($surfaceRegistry.surfaces.PSObject.Properties).Count "Base Surface Registry should be empty"
-    Assert-Equal "0.5.2" $baseVersion "Base version"
+    Assert-Equal "0.5.3" $baseVersion "Base version"
     Assert-True ($baseReadme -match "Surface Default Kit") "README_BASE Surface Kit wording is missing"
     Assert-True ($baseReadme -match "OVERRIDE") "README_BASE override boundary is missing"
     Assert-True (@($catalog.defaults | Where-Object { $_.kind -eq "surface" }).Count -ge 8) "Surface Default catalog entries are incomplete"

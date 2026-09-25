@@ -1,12 +1,13 @@
 # 02 — Roadmap
 
 Current position: Phase 5 — gradual repository adoption / maintenance after the
-v0.5.0 Default feature slice, v0.5.1 Hosted CI bugfix, and v0.5.2 lifecycle
+v0.5.0 Default feature slice, v0.5.1 Hosted CI bugfix, v0.5.2 lifecycle, and
+v0.5.3 integrity-boundary hardening
 safety release.
 Phase 3B safe Default behavior, Phase 4A read-only Canary validation, Phase 4B
 adoption-safety hardening, and the Phase 4C adoption decision review are
 complete. Eight repositories are recorded as cleanly adopted at Base v0.3.8;
-Base v0.5.2 is the current Surface Default Kit safety/lifecycle release over the
+Base v0.5.3 is the current Surface Default Kit safety/lifecycle release over the
 v0.5.0 feature slice. Additional
 repositories are explicitly staged, not adopted, or unavailable according to
 the operation-state table in `project/docs/DEFAULT_ROLLOUT_DRY_RUN.md`.
@@ -231,7 +232,7 @@ Surface Default Kit検証済み状態である。
 ## Phase 5 — 既存repoへの段階導入 / maintenance (current)
 
 専用adoption campaignを継続せず、通常のProject作業に同期判断を組み込む。
-Base v0.5.2を基準版として固定し、全repoを一括書換えしない。
+Base v0.5.3を基準版として固定し、全repoを一括書換えしない。
 
 - 改修するrepoから順次適用
 - project固有ロジックは無理に移動しない
@@ -246,11 +247,12 @@ Base v0.5.2を基準版として固定し、全repoを一括書換えしない�
   同一手作業の反復、または現行Defaultで安全に表現できない共通問題に限定する
 - 詳細な運用手順は [07_PHASE5_OPERATIONS.md](07_PHASE5_OPERATIONS.md) を参照する
 
-v0.5.2でv0.5.0のSurface Kit安全実装範囲（CLI、Windows、MCP、API、Agent）と
+v0.5.3でv0.5.0のSurface Kit安全実装範囲（CLI、Windows、MCP、API、Agent）と
 Tool Default（ci-test、generated-integrity、file-io、pwa、config、logging）を
 固定し、Root/link境界、provenance lifecycle、DISABLED cleanup、Surface別Project
 CI runnerを追加した。以後は実Projectで同じ手作業や障害が反復した場合だけ、
-追加のBase変更を検討する。
+追加のBase変更を検討する。v0.5.3では同一Base version保護、link/reparse-point
+境界、Default所有pathに限定したlifecycle cleanupを固定した。
 
 ## Phase 6 — 安定化
 
