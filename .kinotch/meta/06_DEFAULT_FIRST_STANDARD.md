@@ -129,7 +129,7 @@ nothing. Only `knt migrate --apply` records candidates. Existing `OVERRIDE` and
 
 ## Actual implementation boundary
 
-The current v0.5.2 implementation materializes only removable helpers; the
+The current v0.5.3 implementation materializes only removable helpers; the
 safe lifecycle boundary is part of the same Default system:
 
 - `ci-test` adds a separate non-deploy GitHub Actions workflow when absent; it runs `doctor` → `setup` → `verify` on one runner selected from the Manifest (`gui_windows` uses Windows PowerShell, otherwise Ubuntu PowerShell). The Base repository's own three-environment workflow is not overwritten.
@@ -148,8 +148,12 @@ Default provenance records the source Base version and final materialized-file
 hashes. Upgrade planning considers both the current template tree and recorded
 files: unchanged stale files may be removed, modified stale files are preserved
 and move the pack to `OVERRIDE`, and `DISABLED` cleanup is shown in dry-run and
-performed only by explicit `--apply`. Default and generated writes reject
-symlink, junction, and reparse-point traversal below trusted roots.
+performed only by explicit `--apply`. Recorded paths are deletion-authoritative
+only when they belong to the current Default template tree or are explicitly
+listed as that Default's retired paths; unrelated provenance is untrusted and
+is preserved. Default and generated writes reject symlink, junction, and
+reparse-point traversal below trusted roots. A protected Base refresh rejects
+same-version content changes before rewriting the index or inventory.
 
 Surface Kits are implementation defaults, not Portable Contracts. Their presence
 does not require a Runtime module, a framework, a second registry, or a public

@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "base_version": "0.5.2",
+  "base_version": "0.5.4",
   "files": [
     {
       "path": ".editorconfig",
@@ -20,11 +20,11 @@
     },
     {
       "path": ".kinotch/AGENT_RULES.md",
-      "sha256": "5185e1e923767f820a1716f6624b7d85856132244ac33f960ba60222489d2b4b"
+      "sha256": "30998df5d3714cfde4803ca2d96b4ce42c742ea06e7fa0bfb3530fd3f5181038"
     },
     {
       "path": ".kinotch/BASE_VERSION",
-      "sha256": "26e0ab83aa1ff6bd0ae3882787a92663aa19db128e1241ffc99375fb9ca0c121"
+      "sha256": "a7711142bc1fc55c16b9147a1503a4f2c4717be5c1e4437772a047f52ef81db2"
     },
     {
       "path": ".kinotch/DEVELOPMENT_FLOW.md",
@@ -32,7 +32,7 @@
     },
     {
       "path": ".kinotch/FILE_INVENTORY.txt",
-      "sha256": "90db2fc27fadb18e1d0de965c75ac97af7de644af4cecd76cc8768817817e31e"
+      "sha256": "5046f91a776c6edaaae8b57e91948a0df0eae750233a417f2e681ef489c0e81b"
     },
     {
       "path": ".kinotch/PROJECT_BOUNDARY.md",
@@ -40,11 +40,11 @@
     },
     {
       "path": ".kinotch/README_BASE.md",
-      "sha256": "897253fdf5d2410e53cf9947ad0c9c1e696ac78ad3100af36c0f39ee4579a62a"
+      "sha256": "a3db4ce4867c29016dbed6f3291b15feb104170df36b69ecf291a3fd611d5813"
     },
     {
       "path": ".kinotch/REPOSITORY_STANDARD.md",
-      "sha256": "0031f9cecd1ba91ce50c48659995c489f89068b388dbad4cc833d358c262f075"
+      "sha256": "6e9796cd6c6b1f41264e434c7ea9088f5df7bd1c5b6cb84f93d23a57b9299526"
     },
     {
       "path": ".kinotch/RUNTIME_INTEGRATION.md",
@@ -56,7 +56,7 @@
     },
     {
       "path": ".kinotch/docs/BASE_ROADMAP.md",
-      "sha256": "fe49b78501349117016fddba898df8f729200e5aaf1678b39d7a4981ebfdb28c"
+      "sha256": "ef3fb68e97f5848ad625cb05e3d3907d515f444ed3aeef6c5ff0ed3bdde4df2d"
     },
     {
       "path": ".kinotch/meta/00_CONTEXT.md",
@@ -68,7 +68,7 @@
     },
     {
       "path": ".kinotch/meta/02_ROADMAP.md",
-      "sha256": "683c2f2e0ee0f8a4e93df6d48ae4e8512aa321f0c986d9bd2f21bc6e70155488"
+      "sha256": "63d00357561ed431a42f3876a80c787a9099a1efebe8588f199522d141b3c332"
     },
     {
       "path": ".kinotch/meta/03_GUARDRAILS.md",
@@ -84,15 +84,19 @@
     },
     {
       "path": ".kinotch/meta/06_DEFAULT_FIRST_STANDARD.md",
-      "sha256": "e7a91a51535cf5e39f0ece561f37f3ab927bc1eaaa7b1efb32aa1ff4805b4380"
+      "sha256": "6f20cfd85dd9c337a39f279fcd97c5b59a6613760012a878f6898e9372afbf38"
     },
     {
       "path": ".kinotch/meta/07_PHASE5_OPERATIONS.md",
       "sha256": "ba0111eaceb2ecdec606bc52fb34a59113a81d313849682c3a527cc4e326f372"
     },
     {
+      "path": ".kinotch/meta/08_GITHUB_DEVELOPMENT_CONTROL.md",
+      "sha256": "0ca94d51ba4d39cf1ccd5664cfa8b08d5b64682c248616599107e2074e4b64e7"
+    },
+    {
       "path": ".kinotch/meta/README.md",
-      "sha256": "bf4a787218fbb6a4ad2bfbf4cff810e4fe82b0fc8519a7f5650523be2e8b6dac"
+      "sha256": "368efcd6d94ed40278f7072766dafc2ce2020e0e408b5ff697f2db21ff538acb"
     },
     {
       "path": ".kinotch/profiles/agent.json",
@@ -136,7 +140,7 @@
     },
     {
       "path": ".kinotch/schemas/default-catalog.schema.json",
-      "sha256": "3cd86d0f0d307fcc9ff699a005765086698744c032718b389e4ae36cceb5a5c5"
+      "sha256": "4afe4892eb99208069a2b5929295effd1d286656865461a3a0d51827c4ac53ba"
     },
     {
       "path": ".kinotch/schemas/defaults.schema.json",
@@ -172,7 +176,7 @@
     },
     {
       "path": ".kinotch/scripts/knt.ps1",
-      "sha256": "41b4e79f741d121a1c5709aa1fb466e210b6e3c2ae978516759edd55b609e804"
+      "sha256": "1af95b6a33d175861bedca2772a985eac10d03f3a7587c9b1ebfce579e91f0fc"
     },
     {
       "path": ".kinotch/scripts/path-containment.ps1",
@@ -180,7 +184,7 @@
     },
     {
       "path": ".kinotch/scripts/update-base-index.ps1",
-      "sha256": "f96a97d6e4ca1b7eecfba8131ad8c9242112e670c0fe9e347dcbadd301e30156"
+      "sha256": "889aa286b6ed4757f9cfc5d0d657b194d32b06a87e772d3c404cf5ea7f702bb0"
     },
     {
       "path": ".kinotch/templates/ADR.md",
@@ -408,7 +412,7 @@
     },
     {
       "path": ".kinotch/tests/run-tests.ps1",
-      "sha256": "fde2b2e321ae7899273839f85d04425656c8225d9244f856753339a89bcbed16"
+      "sha256": "e2c8f1a54e622867573eceb9d1d2e3ba6a11f387b95a9721a0943d83cbc494d6"
     },
     {
       "path": "AGENTS.md",

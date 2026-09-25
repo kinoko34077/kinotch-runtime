@@ -64,3 +64,7 @@ RuntimeはBaseへコピーしない。`project/project.json.runtime.modules` で
 ## 9. Base更新
 
 個別repoの共通ファイルを手修正して追従しない。Base側で版を上げ、Conformance / migration手順で更新する。
+
+保護対象のBase snapshotは`BASE_VERSION`と一意に対応する。同じ`BASE_VERSION`のまま保護ファイルを追加・削除・変更して`base-refresh`を実行してはならず、refreshはindexとinventoryを書き換えずに拒否する。保護内容を変更する場合は、先に`BASE_VERSION`を更新し、検証後に`base-refresh`でindexを再生成する。`project/**`のCurrent Stateや作業記録だけの変更は、共通Base snapshotを変えない限りBase version bumpの対象ではない。
+
+Base-check、base-refresh、Default materialization、Default cleanupは、Project rootおよびBase protected pathのcontainmentとsymlink/junction/reparse-point境界を確認する。link traversalが必要なProjectはDefaultではなく`OVERRIDE`として自らの境界を所有する。

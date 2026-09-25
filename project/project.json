@@ -29,8 +29,17 @@
     "setup": "",
     "dev": "",
     "test": {
-      "run": "python -m unittest discover -s project/tests -v",
-      "cwd": "."
+      "exec": "python",
+      "args": [
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "project/tests",
+        "-v"
+      ],
+      "cwd": ".",
+      "forward_args": false
     },
     "build": "",
     "verify": "",
