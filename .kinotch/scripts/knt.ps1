@@ -1395,23 +1395,34 @@ function Invoke-ProjectCommand($Manifest, [string]$Name) {
     Push-Location $cwd
     try {
         $commandOutput = @()
-        if ($spec.mode -eq "structured") {
-            $forwardedArgs = @($RemainingArgs | Where-Object { $null -ne $_ })
-            if ($forwardedArgs.Count -gt 0 -and -not $spec.forward_args) {
-                throw "Structured command '$Name' must set forward_args=true to accept forwarded arguments"
+        $commandErrorActionPreference = $ErrorActionPreference
+        try {
+            # Windows PowerShell 5.1 promotes native stderr merged by 2>&1 to
+            # a terminating NativeCommandError while ErrorActionPreference is
+            # Stop. Capture both streams without changing the command exit
+            # code, then restore the router's fail-fast preference.
+            $ErrorActionPreference = "Continue"
+            if ($spec.mode -eq "structured") {
+                $forwardedArgs = @($RemainingArgs | Where-Object { $null -ne $_ })
+                if ($forwardedArgs.Count -gt 0 -and -not $spec.forward_args) {
+                    throw "Structured command '$Name' must set forward_args=true to accept forwarded arguments"
+                }
+                $invokeArgs = @($spec.args)
+                if ($spec.forward_args) { $invokeArgs += $forwardedArgs }
+                Write-Knt "$Name -> $($spec.exec)"
+                $commandOutput = @(& $spec.exec @invokeArgs 2>&1)
             }
-            $invokeArgs = @($spec.args)
-            if ($spec.forward_args) { $invokeArgs += $forwardedArgs }
-            Write-Knt "$Name -> $($spec.exec)"
-            $commandOutput = @(& $spec.exec @invokeArgs 2>&1)
+            else {
+                $forwardedArgs = @($RemainingArgs | Where-Object { $null -ne $_ })
+                if ($forwardedArgs.Count -gt 0) {
+                    throw "Legacy command '$Name' cannot safely forward arguments; use structured exec/args with forward_args=true"
+                }
+                Write-Knt "$Name -> $($spec.run)"
+                $commandOutput = @(Invoke-Expression $spec.run 2>&1)
+            }
         }
-        else {
-            $forwardedArgs = @($RemainingArgs | Where-Object { $null -ne $_ })
-            if ($forwardedArgs.Count -gt 0) {
-                throw "Legacy command '$Name' cannot safely forward arguments; use structured exec/args with forward_args=true"
-            }
-            Write-Knt "$Name -> $($spec.run)"
-            $commandOutput = @(Invoke-Expression $spec.run 2>&1)
+        finally {
+            $ErrorActionPreference = $commandErrorActionPreference
         }
         $commandExitCode = if ($null -ne $LASTEXITCODE) { [int]$LASTEXITCODE } else { 0 }
         foreach ($outputLine in $commandOutput) { Write-Host $outputLine }

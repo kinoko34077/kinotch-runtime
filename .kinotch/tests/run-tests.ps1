@@ -1,11 +1,19 @@
-$ErrorActionPreference = "Stop"
+# Native commands intentionally exercise stdout/stderr boundaries in several
+# tests. Continue allows Windows PowerShell 5.1 to collect native stderr as
+# data; assertions and explicit throws still fail the corresponding test.
+$ErrorActionPreference = "Continue"
 
 $TestDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 $RepoRoot = Split-Path -Parent (Split-Path -Parent $TestDir)
 $FixtureRoot = Join-Path $RepoRoot ".kinotch/tests/fixtures"
-$PowerShellExecutable = (Get-Command pwsh -ErrorAction SilentlyContinue | Select-Object -First 1).Source
-if ([string]::IsNullOrWhiteSpace($PowerShellExecutable)) {
+$PowerShellExecutable = $null
+if ($PSVersionTable.PSEdition -eq "Desktop") {
     $PowerShellExecutable = (Get-Command powershell -ErrorAction Stop | Select-Object -First 1).Source
+} else {
+    $PowerShellExecutable = (Get-Command pwsh -ErrorAction SilentlyContinue | Select-Object -First 1).Source
+    if ([string]::IsNullOrWhiteSpace($PowerShellExecutable)) {
+        $PowerShellExecutable = (Get-Command powershell -ErrorAction Stop | Select-Object -First 1).Source
+    }
 }
 . (Join-Path $RepoRoot ".kinotch/scripts/update-base-index.ps1")
 . (Join-Path $RepoRoot ".kinotch/scripts/knt-validation.ps1")
@@ -1648,13 +1656,28 @@ Write-KntConsoleLog -Record $record -Json
 '@
         Set-Content -LiteralPath $probe -Value $probeText -Encoding UTF8
         $stderrPath = Join-Path $root "logging-default.stderr"
-        $stdout = @(& $PowerShellExecutable -NoProfile -ExecutionPolicy Bypass -File $probe -HelperPath $helper 2> $stderrPath)
-        Assert-Equal 0 $LASTEXITCODE "Logging Default probe exit code"
-        Assert-True (($stdout -join "`n") -match "stdout-marker") "Logging probe did not complete"
-        $stderr = Get-Content -Raw -Encoding UTF8 $stderrPath | ConvertFrom-Json
+        $stdoutPath = Join-Path $root "logging-default.stdout"
+        $arguments = @(
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            ('"' + $probe + '"'),
+            "-HelperPath",
+            ('"' + $helper + '"')
+        )
+        $process = Start-Process -FilePath $PowerShellExecutable -ArgumentList $arguments -RedirectStandardOutput $stdoutPath -RedirectStandardError $stderrPath -Wait -PassThru
+        Assert-Equal 0 $process.ExitCode "Logging Default probe exit code"
+        $stdout = Get-Content -Raw -Encoding UTF8 $stdoutPath
+        Assert-True ($stdout -match "stdout-marker") "Logging probe did not complete"
+        $stderrText = Get-Content -Raw -Encoding UTF8 $stderrPath
+        $jsonStart = $stderrText.IndexOf("{")
+        $jsonEnd = $stderrText.LastIndexOf("}")
+        Assert-True ($jsonStart -ge 0 -and $jsonEnd -gt $jsonStart) "Logging stderr did not contain a JSON record"
+        $stderr = $stderrText.Substring($jsonStart, $jsonEnd - $jsonStart + 1) | ConvertFrom-Json
         Assert-Equal "warning" $stderr.level "structured log level"
         Assert-Equal "ready" $stderr.message "structured log message"
-        Assert-True (-not (($stdout -join "`n") -match "ready|warning")) "Logging polluted stdout"
+        Assert-True ($stdout -notmatch "ready|warning") "Logging polluted stdout"
     }
 }
 Invoke-TestCase "oneOf requires exactly one matching schema" {
@@ -1729,6 +1752,20 @@ Invoke-TestCase "unknown command returns two" {
 }
 Invoke-TestCase "project command exit code propagates" {
     Invoke-KntFixture -Name "command-failure" -Command "test" -ExpectedExit 7
+}
+Invoke-TestCase "project command preserves native stderr with success exit" {
+    Invoke-KntFixture -Name "valid-minimal" -Command "test" -ExpectedExit 0 -Prepare {
+        param($root)
+        $manifestPath = Join-Path $root "project/project.json"
+        $manifest = Get-Content -Raw -Encoding UTF8 $manifestPath | ConvertFrom-Json
+        $manifest.commands.test = [pscustomobject]@{
+            exec = $PowerShellExecutable
+            args = @("-NoProfile", "-Command", "[Console]::Error.WriteLine('diagnostic')")
+            cwd = "."
+            forward_args = $false
+        }
+        [IO.File]::WriteAllText($manifestPath, (ConvertTo-Json $manifest -Depth 20) + [Environment]::NewLine, (New-Object System.Text.UTF8Encoding($false)))
+    }
 }
 Invoke-TestCase "structured command forwards metacharacters without injection" {
     $malicious = "; Set-Content injected.txt pwned; `$(Get-Date) | & echo escaped"
@@ -1870,7 +1907,7 @@ Invoke-TestCase "base-refresh indexes new common file after version bump" {
         Set-FixtureAsBase $root
         Set-FixtureBaseIndex $root
         Set-Content -LiteralPath (Join-Path $root ".kinotch/new-common.txt") -Value "new common file" -NoNewline
-        Set-Content -LiteralPath (Join-Path $root ".kinotch/BASE_VERSION") -Value "0.5.4" -NoNewline
+        Set-Content -LiteralPath (Join-Path $root ".kinotch/BASE_VERSION") -Value "0.5.5" -NoNewline
         $router = Join-Path $root ".kinotch/scripts/knt.ps1"
         $before = @(& $PowerShellExecutable -NoProfile -ExecutionPolicy Bypass -File $router -RootOverride $root base-check 2>&1)
         if ($LASTEXITCODE -eq 0) { throw "unindexed Base file was not rejected: $($before -join ' ')" }
@@ -1886,10 +1923,10 @@ Invoke-TestCase "Base documentation and profile metadata are finalized" {
     $spec = Get-Content -Raw (Join-Path $RepoRoot "project/docs/SPEC.md")
     $state = Get-Content -Raw (Join-Path $RepoRoot "project/docs/CURRENT_STATE.md")
     $runtime = Get-Content -Raw (Join-Path $RepoRoot ".kinotch/RUNTIME_INTEGRATION.md")
-    $baseReadme = Get-Content -Raw (Join-Path $RepoRoot ".kinotch/README_BASE.md")
+    $baseReadme = Get-Content -Raw -Encoding UTF8 (Join-Path $RepoRoot ".kinotch/README_BASE.md")
     $workflow = Get-Content -Raw (Join-Path $RepoRoot ".github/workflows/verify.yml")
     $surfaceRegistry = Get-Content -Raw (Join-Path $RepoRoot "project/contracts/surfaces.json") | ConvertFrom-Json
-    $catalog = Get-Content -Raw (Join-Path $RepoRoot ".kinotch/defaults/catalog.json") | ConvertFrom-Json
+    $catalog = Get-Content -Raw -Encoding UTF8 (Join-Path $RepoRoot ".kinotch/defaults/catalog.json") | ConvertFrom-Json
     $baseVersion = (Get-Content -Raw (Join-Path $RepoRoot ".kinotch/BASE_VERSION")).Trim()
     Assert-True (([regex]::Matches($spec, "(?m)^\d+\. ")).Count -ge 10) "SPEC acceptance criteria are incomplete"
     Assert-True ($state -notmatch "Project-specific definition has not been filled") "CURRENT_STATE still contains a template placeholder"
@@ -1900,7 +1937,7 @@ Invoke-TestCase "Base documentation and profile metadata are finalized" {
     Assert-True ($workflow -match "knt\.ps1 setup") "Base CI setup step is missing"
     Assert-True ($workflow -match "actions/checkout@[0-9a-f]{40}(?:\s+#\s+v4)?") "Base Verify checkout action is not pinned to a full commit SHA"
     Assert-Equal 0 @($surfaceRegistry.surfaces.PSObject.Properties).Count "Base Surface Registry should be empty"
-    Assert-Equal "0.5.3" $baseVersion "Base version"
+    Assert-Equal "0.5.4" $baseVersion "Base version"
     Assert-True ($baseReadme -match "Surface Default Kit") "README_BASE Surface Kit wording is missing"
     Assert-True ($baseReadme -match "OVERRIDE") "README_BASE override boundary is missing"
     Assert-True (@($catalog.defaults | Where-Object { $_.kind -eq "surface" }).Count -ge 8) "Surface Default catalog entries are incomplete"
