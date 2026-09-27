@@ -20,7 +20,7 @@ Base-wide MetaとTemplateは共通層に置く。個別Projectの情報を `.kin
 
 ## Cross-repository GitHub workflow
 
-複数Repositoryの横断管理、GitHub Issue / PRを使った監査・実装運用、またはAgentのGitHub操作境界を扱う場合は、まず`.kinotch/meta/08_GITHUB_DEVELOPMENT_CONTROL.md`でBaseとの接続境界を確認し、横断運用の正本として`kinoko34077/devflow-test/docs/spec/CROSS_REPOSITORY_DEVELOPMENT_CONTROL.md`を参照する。
+複数Repositoryの横断管理、GitHub Issue / PRを使った監査・実装運用、またはAgentのGitHub操作境界を扱う場合は、まず`.kinotch/meta/08_GITHUB_DEVELOPMENT_CONTROL.md`でBaseとの接続境界を確認し、横断運用の正本として`kinoko34077/devflow/docs/spec/CROSS_REPOSITORY_DEVELOPMENT_CONTROL.md`を参照する。
 
 GitHub Projectは表示層であり、横断Current Stateの正本ではない。横断Current StateはdevflowのRepository Control Issue / Work Orderを参照する。
 

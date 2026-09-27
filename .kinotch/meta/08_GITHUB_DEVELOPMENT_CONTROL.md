@@ -8,7 +8,7 @@
 
 現在の横断正本:
 
-- Repository: `kinoko34077/devflow-test`
+- Repository: `kinoko34077/devflow`
 - Canonical specification: `docs/spec/CROSS_REPOSITORY_DEVELOPMENT_CONTROL.md`
 - Project synchronization operations: `docs/project/PROJECT_SYNC.md`
 - Machine-readable workflow definition: `.devflow/WORKFLOW.yaml`
