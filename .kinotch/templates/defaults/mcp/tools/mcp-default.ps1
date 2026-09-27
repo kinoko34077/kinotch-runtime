@@ -27,17 +27,14 @@ function Resolve-McpProjectPath {
     }
     $repositoryRoot = Split-Path -Parent $ProjectRoot
     $containmentPath = Join-Path $repositoryRoot ".kinotch/scripts/path-containment.ps1"
-    if (-not (Get-Command Test-KntProjectPathContained -ErrorAction SilentlyContinue)) {
+    if (-not (Get-Command Assert-KntSafePath -ErrorAction SilentlyContinue)) {
         if (-not (Test-Path -LiteralPath $containmentPath -PathType Leaf)) {
             throw "KiNoTch path containment helper is missing"
         }
         . $containmentPath
     }
     $candidate = [IO.Path]::GetFullPath((Join-Path $ProjectRoot $RelativePath))
-    if (-not (Test-KntProjectPathContained -Root $ProjectRoot -Candidate $candidate -AllowRoot)) {
-        throw "MCP Project path escapes the Project boundary: $RelativePath"
-    }
-    return $candidate
+    return (Assert-KntSafePath -Root $ProjectRoot -Candidate $candidate -Description "MCP Project path" -AllowRoot)
 }
 
 function New-McpDiagnostic {

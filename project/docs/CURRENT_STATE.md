@@ -1,10 +1,10 @@
 # Current State
 
-Last verified: 2026-09-26 — KiNoTch. Runtime v0.1 fourth/fifth Pilot design-probe evaluation complete; embedded Repository Base v0.5.4 common-layer sync verified
+Last verified: 2026-09-27 — KiNoTch. Runtime v0.1 fourth/fifth Pilot design-probe evaluation complete; embedded Repository Base v0.5.13 common-layer sync verified against Repository Base main `381f08a28b1dd0c442196d23675f952322e7f585`
 
 ## Implemented
 
-- Embedded Repository Base v0.5.4 common layer (synced from the Repository Base)
+- Embedded Repository Base v0.5.13 common layer (synced from Repository Base main `381f08a28b1dd0c442196d23675f952322e7f585`)
 - Python reference Runtime package under `project/src/kinotch_runtime/`
 - Action registry and execution kernel
 - Structured result and extensible error values
@@ -81,3 +81,8 @@ Last verified: 2026-09-26 — KiNoTch. Runtime v0.1 fourth/fifth Pilot design-pr
 7. Keep Default Pack adoption independent from Contract maturity; add Runtime
    or Surface code only when a Default has a separate, low-risk implementation
    boundary and remains overrideable or disableable.
+
+## Verification
+
+- Embedded Base integrity and diagnostics: `knt base-check` and `knt doctor` passed after the v0.5.13 sync.
+- Runtime project gate: `knt verify` passed with 18 tests.

@@ -1,6 +1,6 @@
 # KiNoTch. Repository Base — Common README
 
-Base version: `0.5.4`
+Base version: `0.5.9`
 
 この文書はKiNoTch.標準リポジトリの共通取扱説明書である。個別READMEへ同じ説明を複製しない。
 
@@ -15,7 +15,7 @@ KiNoTch.Runtime = 複数repoで再利用する共通実装。個別repoへコピ
 
 Base-wide Metaは `.kinotch/meta/` に置き、新規Repository用の生成元は `.kinotch/templates/project/` に置く。Base自身のProject情報は `project/**` に記録し、Templateと混同しない。
 
-Base v0.5.4は、v0.5.3の安全境界に加え、Windows PowerShell 5.1を含むnative command stderrの安全な捕捉を修正した保守releaseである。CLI、Windows、MCP、API、AgentのSurface Default Kitと、ci-test、generated-integrity、file-io、pwa、config、loggingのTool Defaultは、Domain非依存で安全に外せる補助境界を提供する。既存FrameworkやProject実装はOVERRIDEとして維持でき、Runtime semanticsは変更しない。通常の運用方針は [Phase 5 Operations](meta/07_PHASE5_OPERATIONS.md) を参照する。
+Base v0.5.9は、v0.5.8のdevflow identity整合とProject command結果判定を維持しつつ、shape-probe self-test fixtureがrepository上の一時的・無関係なworkflowを継承しないようworkflow集合をケース単位で隔離する保守releaseである。CLI、Windows、MCP、API、AgentのSurface Default Kitと、ci-test、generated-integrity、file-io、pwa、config、loggingのTool Defaultは、Domain非依存で安全に外せる補助境界を提供する。既存FrameworkやProject実装はOVERRIDEとして維持でき、Runtime semanticsは変更しない。通常の運用方針は [Phase 5 Operations](meta/07_PHASE5_OPERATIONS.md) を参照する。
 
 ## Default-first
 
@@ -47,6 +47,8 @@ PowerShell:
 ```
 
 各コマンドの実体は `project/project.json` の `commands` に定義する。Base側の入口は変更しない。
+
+Legacy `commands.*.run` values are evaluated as a scriptblock so a terminal `return` can be observed safely. `exit` is unsupported for legacy commands because it terminates the knt process; use a structured `exec` command that returns an exit code instead.
 
 ## doctor
 

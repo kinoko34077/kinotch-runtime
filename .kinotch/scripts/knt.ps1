@@ -1395,13 +1395,18 @@ function Invoke-ProjectCommand($Manifest, [string]$Name) {
     Push-Location $cwd
     try {
         $commandOutput = @()
+        $commandExitCode = 0
         $commandErrorActionPreference = $ErrorActionPreference
         try {
-            # Windows PowerShell 5.1 promotes native stderr merged by 2>&1 to
-            # a terminating NativeCommandError while ErrorActionPreference is
-            # Stop. Capture both streams without changing the command exit
-            # code, then restore the router's fail-fast preference.
+            # Windows PowerShell 5.1 can surface native stderr merged by 2>&1
+            # as NativeCommandError even when the native process exits 0.
+            # Keep native process exit semantics separate from PowerShell
+            # ErrorRecord semantics so stderr diagnostics do not become
+            # failures and PowerShell errors do not become false successes.
             $ErrorActionPreference = "Continue"
+            # Reset the process-wide automatic variable without creating a
+            # function-local LASTEXITCODE that would shadow native updates.
+            $global:LASTEXITCODE = $null
             if ($spec.mode -eq "structured") {
                 $forwardedArgs = @($RemainingArgs | Where-Object { $null -ne $_ })
                 if ($forwardedArgs.Count -gt 0 -and -not $spec.forward_args) {
@@ -1410,7 +1415,42 @@ function Invoke-ProjectCommand($Manifest, [string]$Name) {
                 $invokeArgs = @($spec.args)
                 if ($spec.forward_args) { $invokeArgs += $forwardedArgs }
                 Write-Knt "$Name -> $($spec.exec)"
-                $commandOutput = @(& $spec.exec @invokeArgs 2>&1)
+
+                $resolvedCommand = Get-Command -Name $spec.exec -ErrorAction Stop | Select-Object -First 1
+                while ($resolvedCommand.CommandType -eq [System.Management.Automation.CommandTypes]::Alias) {
+                    $resolvedCommand = $resolvedCommand.ResolvedCommand
+                }
+                $isNativeCommand = $resolvedCommand.CommandType -eq [System.Management.Automation.CommandTypes]::Application
+                $structuredErrorRecords = @()
+                if ($isNativeCommand) {
+                    # Native stderr is intentionally merged into output so the
+                    # existing Windows PowerShell diagnostic behavior is preserved.
+                    # Its process exit code remains the source of truth.
+                    $commandOutput = @(& $spec.exec @invokeArgs 2>&1)
+                }
+                else {
+                    # Do not infer command errors from the process-wide Error list:
+                    # a command can clear it, and a full list can drop the oldest
+                    # record at the MaximumErrorCount. ErrorVariable captures the
+                    # ErrorRecords emitted by this invocation independently.
+                    $commandOutput = @(& $spec.exec @invokeArgs -ErrorVariable structuredErrorRecords 2>&1)
+                }
+                $powerShellSucceeded = $?
+                $nativeExitCode = $LASTEXITCODE
+                $emittedErrors = @($commandOutput | Where-Object { $_ -is [System.Management.Automation.ErrorRecord] })
+                if ($isNativeCommand) {
+                    $structuredErrorRecords = @($emittedErrors)
+                }
+                else {
+                    $structuredErrorRecords = @($structuredErrorRecords | Where-Object { $_ -is [System.Management.Automation.ErrorRecord] })
+                }
+
+                if ($isNativeCommand) {
+                    $commandExitCode = if ($null -ne $nativeExitCode) { [int]$nativeExitCode } elseif ($powerShellSucceeded) { 0 } else { 1 }
+                }
+                else {
+                    $commandExitCode = if ($powerShellSucceeded -and $structuredErrorRecords.Count -eq 0) { 0 } else { 1 }
+                }
             }
             else {
                 $forwardedArgs = @($RemainingArgs | Where-Object { $null -ne $_ })
@@ -1418,13 +1458,62 @@ function Invoke-ProjectCommand($Manifest, [string]$Name) {
                     throw "Legacy command '$Name' cannot safely forward arguments; use structured exec/args with forward_args=true"
                 }
                 Write-Knt "$Name -> $($spec.run)"
-                $commandOutput = @(Invoke-Expression $spec.run 2>&1)
+                # Compose a wrapper whose finally block observes the user's
+                # terminal command status before the outer output array can
+                # overwrite it. A return exits the wrapper scope, but still
+                # runs finally; exit remains unsupported and terminates knt.
+                $legacyInvocationResult = [pscustomobject]@{
+                    PowerShellSucceeded = $null
+                    NativeExitCode = $null
+                }
+                $legacyResultVariable = "__kntLegacyResult_" + [guid]::NewGuid().ToString("N")
+                Set-Variable -Name $legacyResultVariable -Value $legacyInvocationResult -Scope Local
+                $legacyScriptText = "try {" + [Environment]::NewLine +
+                    [string]$spec.run + [Environment]::NewLine +
+                    "} finally {" + [Environment]::NewLine +
+                    ('$' + $legacyResultVariable + '.PowerShellSucceeded = $?') + [Environment]::NewLine +
+                    ('$' + $legacyResultVariable + '.NativeExitCode = $LASTEXITCODE') + [Environment]::NewLine +
+                    "}"
+                $legacyScript = [scriptblock]::Create($legacyScriptText)
+                $commandOutput = @(& $legacyScript 2>&1)
+                $powerShellSucceeded = ($legacyInvocationResult.PowerShellSucceeded -eq $true)
+                $nativeExitCode = $legacyInvocationResult.NativeExitCode
+
+                # Error also records intentionally handled errors such as
+                # -ErrorAction SilentlyContinue. Only ErrorRecords that actually reached
+                # the merged error stream are unhandled command errors here.
+                $emittedErrors = @($commandOutput | Where-Object { $_ -is [System.Management.Automation.ErrorRecord] })
+                $nonNativeErrors = @($emittedErrors | Where-Object { [string]$_.FullyQualifiedErrorId -notlike 'NativeCommandError*' })
+
+                if ($nonNativeErrors.Count -gt 0) {
+                    $commandExitCode = 1
+                }
+                elseif ($null -ne $nativeExitCode -and [int]$nativeExitCode -ne 0 -and -not $powerShellSucceeded) {
+                    # Windows PowerShell 5.1 reports the compound native
+                    # command's terminal failure through both fields when
+                    # the status is captured inside the wrapper finally block.
+                    $commandExitCode = [int]$nativeExitCode
+                }
+                elseif ($powerShellSucceeded) {
+                    # A later successful PowerShell operation must not inherit
+                    # a stale LASTEXITCODE from an earlier native process.
+                    $commandExitCode = 0
+                }
+                elseif ($null -ne $nativeExitCode -and [int]$nativeExitCode -ne 0) {
+                    $commandExitCode = [int]$nativeExitCode
+                }
+                elseif ($emittedErrors.Count -gt 0 -and $nonNativeErrors.Count -eq 0) {
+                    # Windows PowerShell 5.1 native stderr with exit 0.
+                    $commandExitCode = 0
+                }
+                else {
+                    $commandExitCode = 1
+                }
             }
         }
         finally {
             $ErrorActionPreference = $commandErrorActionPreference
         }
-        $commandExitCode = if ($null -ne $LASTEXITCODE) { [int]$LASTEXITCODE } else { 0 }
         foreach ($outputLine in $commandOutput) { Write-Host $outputLine }
         return $commandExitCode
     }
